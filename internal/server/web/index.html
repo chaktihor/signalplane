@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SignalPlane</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">SP</div>
+        <div>
+          <strong>SignalPlane</strong>
+          <span>Silver live</span>
+        </div>
+      </div>
+      <nav>
+        <a href="#overview">Overview</a>
+        <a href="#services">Services</a>
+        <a href="#hosts">Hosts</a>
+        <a href="#logs">Logs</a>
+        <a href="#traces">Traces</a>
+        <a href="#alerts">Alerts</a>
+      </nav>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Open observability control plane</p>
+          <h1>SignalPlane</h1>
+        </div>
+        <div id="health-pill" class="pill">Loading</div>
+      </header>
+
+      <section id="overview" class="metric-grid"></section>
+
+      <section class="panel" id="services">
+        <div class="section-head">
+          <h2>Services</h2>
+          <button id="refresh">Refresh</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Status</th><th>Owner</th><th>p95</th><th>Error rate</th></tr></thead>
+            <tbody id="services-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="split">
+        <div class="panel" id="hosts">
+          <div class="section-head"><h2>Hosts</h2></div>
+          <div id="hosts-list" class="list"></div>
+        </div>
+        <div class="panel" id="alerts">
+          <div class="section-head"><h2>Alerts</h2></div>
+          <div id="alerts-list" class="list"></div>
+        </div>
+      </section>
+
+      <section class="split">
+        <div class="panel" id="logs">
+          <div class="section-head"><h2>Recent Logs</h2></div>
+          <div id="logs-list" class="list mono"></div>
+        </div>
+        <div class="panel" id="traces">
+          <div class="section-head"><h2>Recent Traces</h2></div>
+          <div id="traces-list" class="list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
+

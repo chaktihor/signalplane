@@ -1,0 +1,245 @@
+# SignalPlane User Guide
+
+This guide explains how to use the Silver developer preview after installation.
+
+## Open The Dashboard
+
+Start SignalPlane, then open:
+
+```text
+http://127.0.0.1:4318
+```
+
+The dashboard has these areas:
+
+- **Overview**: Counts for services, hosts, logs, traces, metrics, alerts, incidents, and uptime monitors.
+- **Services**: Applications and dependencies inferred from telemetry.
+- **Hosts**: Machines, process locations, or pod-like resources inferred from telemetry.
+- **Logs**: Recent log events.
+- **Traces**: Recent traces and spans.
+- **Alerts**: Open alerts created from error telemetry.
+
+## First Things To Check
+
+1. Confirm the health pill says `HEALTHY`.
+2. Confirm demo services appear.
+3. Send a test log.
+4. Refresh the dashboard.
+5. Confirm the new service appears.
+
+## Send Your First Log
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/ingest/logs \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "severity": "info",
+    "message": "hello from my service",
+    "resource": {
+      "service": "my-service",
+      "host": "my-host",
+      "environment": "production"
+    }
+  }'
+```
+
+Refresh the dashboard. You should see:
+
+- `my-service` in Services.
+- `my-host` in Hosts.
+- The log in Recent Logs.
+
+## Create An Alert With An Error Log
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/ingest/logs \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "severity": "error",
+    "message": "database timeout",
+    "traceId": "trace-example-1",
+    "resource": {
+      "service": "orders-api",
+      "host": "orders-1",
+      "environment": "production"
+    }
+  }'
+```
+
+SignalPlane will create:
+
+- A log record.
+- An inferred service.
+- An inferred host.
+- An open alert.
+
+## View Services
+
+Services are inferred from telemetry. A service appears when telemetry includes:
+
+```json
+{
+  "resource": {
+    "service": "orders-api"
+  }
+}
+```
+
+API:
+
+```bash
+curl http://127.0.0.1:4318/api/services
+```
+
+## View Hosts
+
+Hosts are inferred from telemetry. A host appears when telemetry includes:
+
+```json
+{
+  "resource": {
+    "host": "orders-1"
+  }
+}
+```
+
+API:
+
+```bash
+curl http://127.0.0.1:4318/api/hosts
+```
+
+## View Logs
+
+List recent logs:
+
+```bash
+curl http://127.0.0.1:4318/api/logs
+```
+
+Filter by service:
+
+```bash
+curl 'http://127.0.0.1:4318/api/logs?service=orders-api'
+```
+
+Filter by severity:
+
+```bash
+curl 'http://127.0.0.1:4318/api/logs?severity=error'
+```
+
+Search message text:
+
+```bash
+curl 'http://127.0.0.1:4318/api/logs?q=timeout'
+```
+
+## View Traces
+
+List recent traces:
+
+```bash
+curl http://127.0.0.1:4318/api/traces
+```
+
+Filter by service:
+
+```bash
+curl 'http://127.0.0.1:4318/api/traces?service=orders-api'
+```
+
+Filter by status:
+
+```bash
+curl 'http://127.0.0.1:4318/api/traces?status=error'
+```
+
+## View Alerts
+
+```bash
+curl http://127.0.0.1:4318/api/alerts
+```
+
+Acknowledge an alert:
+
+```bash
+curl -X PATCH http://127.0.0.1:4318/api/alerts/ALERT_ID \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "acknowledged"}'
+```
+
+Resolve an alert:
+
+```bash
+curl -X PATCH http://127.0.0.1:4318/api/alerts/ALERT_ID \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "resolved"}'
+```
+
+## Create An Incident
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/incidents \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Checkout degradation",
+    "severity": "warning",
+    "owner": "platform",
+    "affectedServices": ["orders-api"]
+  }'
+```
+
+## Register An Uptime Monitor
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/uptime-monitors \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Orders API health",
+    "url": "http://localhost:8080/healthz",
+    "method": "GET",
+    "expectedStatus": 200,
+    "intervalSeconds": 60,
+    "timeoutSeconds": 5
+  }'
+```
+
+Scheduled execution is not implemented yet. The current API stores monitor definitions.
+
+## Run The Example Applications
+
+SignalPlane includes test applications for common workloads:
+
+```bash
+./examples/test-applications/run_all.sh
+```
+
+This sends telemetry from:
+
+- Go backend API.
+- Node microservice.
+- Python web backend.
+- Python worker.
+- Database simulator.
+- C host probe.
+- Kubernetes-style workload metadata.
+- Uptime target monitor.
+
+## Current Limitations
+
+Silver preview does not yet include:
+
+- Real login/session UI.
+- Configurable alert rules.
+- Notification channels.
+- Scheduled uptime checks.
+- Saved dashboards.
+- OpenTelemetry OTLP ingestion.
+- Production telemetry database.

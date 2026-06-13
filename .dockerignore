@@ -1,0 +1,7 @@
+.git
+bin
+data
+*.log
+examples/test-applications/c-host-probe/host_probe
+**/__pycache__
+

@@ -1,5 +1,32 @@
 # SignalPlane Roadmap
 
+## Current Baseline
+
+The repository now contains a Silver developer preview:
+
+- Single Go binary serving API and web UI.
+- Docker Compose stack.
+- File-backed JSON persistence.
+- Scoped API tokens.
+- HTTP JSON ingestion for metrics, logs, traces, and hosts.
+- Inferred services and hosts.
+- Error-log and error-trace alert creation.
+- Incident records.
+- Uptime monitor definitions.
+- Example telemetry producers.
+- Installation, operations, telemetry, API, and user docs.
+
+This baseline proves the local product loop. The next work should make Silver genuinely useful before expanding into Gold.
+
+## Next Engineering Priorities
+
+1. Replace custom JSON-only ingestion with OTLP HTTP/gRPC ingestion while keeping the simple JSON API for demos.
+2. Add real authentication, session UI, and organization/user/role management.
+3. Build proper explorer pages for logs, traces, metrics, services, hosts, alerts, incidents, and uptime.
+4. Add configurable alert rules, notification channels, and scheduled uptime checks.
+5. Move production telemetry to durable queryable storage while keeping local file mode for quick demos.
+6. Add CI, release artifacts, and basic performance tests.
+
 ## Phase 0: Product Foundation
 
 - Finalize brand and product vocabulary.
@@ -103,4 +130,3 @@
 - Multi-region ingestion.
 - Disaster recovery.
 - Enterprise compliance reports.
-
