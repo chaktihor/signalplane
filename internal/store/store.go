@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -197,16 +198,20 @@ type TimelineEvent struct {
 }
 
 type UptimeMonitor struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	URL             string `json:"url"`
-	Method          string `json:"method"`
-	ExpectedStatus  int    `json:"expectedStatus"`
-	IntervalSeconds int    `json:"intervalSeconds"`
-	TimeoutSeconds  int    `json:"timeoutSeconds"`
-	Status          string `json:"status"`
-	LastCheckedAt   string `json:"lastCheckedAt,omitempty"`
-	CreatedAt       string `json:"createdAt"`
+	ID                  string  `json:"id"`
+	Name                string  `json:"name"`
+	URL                 string  `json:"url"`
+	Method              string  `json:"method"`
+	ExpectedStatus      int     `json:"expectedStatus"`
+	IntervalSeconds     int     `json:"intervalSeconds"`
+	TimeoutSeconds      int     `json:"timeoutSeconds"`
+	Status              string  `json:"status"`
+	LastCheckedAt       string  `json:"lastCheckedAt,omitempty"`
+	LastStatusCode      int     `json:"lastStatusCode,omitempty"`
+	LastResponseMS      float64 `json:"lastResponseMs,omitempty"`
+	LastError           string  `json:"lastError,omitempty"`
+	ConsecutiveFailures int     `json:"consecutiveFailures,omitempty"`
+	CreatedAt           string  `json:"createdAt"`
 }
 
 type AuditEvent struct {
@@ -292,6 +297,15 @@ type TokenInput struct {
 	Name  string `json:"name"`
 	Token string `json:"token"`
 	Scope string `json:"scope"`
+}
+
+type UptimeResult struct {
+	ID         string
+	Status     string
+	StatusCode int
+	ResponseMS float64
+	Error      string
+	CheckedAt  string
 }
 
 func New() *Store {
@@ -566,6 +580,8 @@ func (s *Store) IngestMetrics(inputs []MetricInput) []Metric {
 			Labels: cloneMap(input.Labels), Resource: resource,
 		}
 		s.metrics = prependBounded(s.metrics, metric, 5000)
+		s.updateServiceStatsFromMetricLocked(metric)
+		s.evaluateMetricAlertLocked(metric)
 		out = append(out, metric)
 	}
 	_ = s.saveLocked()
@@ -670,6 +686,37 @@ func (s *Store) CreateUptimeMonitor(input UptimeMonitor) UptimeMonitor {
 	return monitor
 }
 
+func (s *Store) RecordUptimeResult(result UptimeResult) (UptimeMonitor, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	monitor, ok := s.uptime[result.ID]
+	if !ok {
+		return UptimeMonitor{}, false
+	}
+	monitor.Status = coalesce(result.Status, "unknown")
+	monitor.LastCheckedAt = coalesce(result.CheckedAt, now())
+	monitor.LastStatusCode = result.StatusCode
+	monitor.LastResponseMS = result.ResponseMS
+	monitor.LastError = result.Error
+	if monitor.Status == "up" {
+		monitor.ConsecutiveFailures = 0
+	} else {
+		monitor.ConsecutiveFailures++
+		s.createAlertOnceLocked(Alert{
+			Title:    "Uptime check failed: " + monitor.Name,
+			Severity: "critical",
+			Source:   "uptime",
+			EntityID: monitor.ID,
+			Message:  firstNonEmpty(monitor.LastError, "expected status "+strconv.Itoa(monitor.ExpectedStatus)+", got "+strconv.Itoa(monitor.LastStatusCode)),
+			Labels:   map[string]string{"monitor": monitor.Name, "url": monitor.URL},
+		})
+	}
+	s.uptime[monitor.ID] = monitor
+	s.auditLocked("uptime.checked", "uptimeMonitor", monitor.ID, map[string]string{"status": monitor.Status})
+	_ = s.saveLocked()
+	return monitor, true
+}
+
 func (s *Store) CreateIncident(input Incident) Incident {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -713,12 +760,16 @@ func (s *Store) UpdateAlert(id, status string) (Alert, bool) {
 func (s *Store) Services(max int) []Service {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return take(mapValues(s.services), saneLimit(max))
+	services := mapValues(s.services)
+	sort.SliceStable(services, func(i, j int) bool { return services[i].Name < services[j].Name })
+	return take(services, saneLimit(max))
 }
 func (s *Store) Hosts(max int) []Host {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return take(mapValues(s.hosts), saneLimit(max))
+	hosts := mapValues(s.hosts)
+	sort.SliceStable(hosts, func(i, j int) bool { return hosts[i].Name < hosts[j].Name })
+	return take(hosts, saneLimit(max))
 }
 func (s *Store) Metrics(max int) []Metric {
 	s.mu.RLock()
@@ -773,7 +824,15 @@ func (s *Store) Incidents(max int) []Incident {
 func (s *Store) UptimeMonitors(max int) []UptimeMonitor {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return take(mapValues(s.uptime), saneLimit(max))
+	monitors := mapValues(s.uptime)
+	sort.SliceStable(monitors, func(i, j int) bool { return monitors[i].Name < monitors[j].Name })
+	return take(monitors, saneLimit(max))
+}
+func (s *Store) UptimeMonitor(id string) (UptimeMonitor, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	monitor, ok := s.uptime[id]
+	return monitor, ok
 }
 func (s *Store) AuditEvents(max int) []AuditEvent {
 	s.mu.RLock()
@@ -802,7 +861,11 @@ func (s *Store) ensureEntitiesLocked(resource Resource) {
 		s.upsertHostLocked(HostInput{Name: resource.Host, Environment: resource.Environment, Region: resource.Region})
 	}
 	if resource.Service != "" {
-		s.upsertServiceLocked(Service{ID: resource.Service, Name: resource.Service, Environment: firstNonEmpty(resource.Environment, "production"), Region: firstNonEmpty(resource.Region, "local"), Status: "healthy", Version: firstNonEmpty(resource.Version, "unknown")})
+		status := ""
+		if _, exists := s.services[resource.Service]; !exists {
+			status = "healthy"
+		}
+		s.upsertServiceLocked(Service{ID: resource.Service, Name: resource.Service, Environment: firstNonEmpty(resource.Environment, "production"), Region: firstNonEmpty(resource.Region, "local"), Status: status, Version: firstNonEmpty(resource.Version, "unknown")})
 	}
 }
 
@@ -833,6 +896,89 @@ func (s *Store) createAlertLocked(input Alert) Alert {
 	s.alerts[alert.ID] = alert
 	s.auditLocked("alert.created", "alert", alert.ID, map[string]string{"source": alert.Source})
 	return alert
+}
+
+func (s *Store) createAlertOnceLocked(input Alert) Alert {
+	for _, existing := range s.alerts {
+		if existing.Status == "open" && existing.Source == input.Source && existing.EntityID == input.EntityID && existing.Title == input.Title {
+			existing.Timestamp = now()
+			existing.Severity = normalizeAlertSeverity(firstNonEmpty(input.Severity, existing.Severity))
+			existing.Message = firstNonEmpty(input.Message, existing.Message)
+			if input.Labels != nil {
+				existing.Labels = input.Labels
+			}
+			s.alerts[existing.ID] = existing
+			return existing
+		}
+	}
+	return s.createAlertLocked(input)
+}
+
+func (s *Store) updateServiceStatsFromMetricLocked(metric Metric) {
+	if metric.Resource.Service == "" {
+		return
+	}
+	name := strings.ToLower(metric.Name)
+	service := s.upsertServiceLocked(Service{ID: metric.Resource.Service, Name: metric.Resource.Service, Environment: metric.Resource.Environment, Region: metric.Resource.Region, Version: metric.Resource.Version})
+	stats := service.Stats
+	switch {
+	case strings.Contains(name, "request_rate") || strings.Contains(name, "request.rate"):
+		stats.RequestRate = metric.Value
+	case strings.Contains(name, "error_rate") || strings.Contains(name, "error.rate"):
+		stats.ErrorRate = metric.Value
+	case strings.Contains(name, "duration") || strings.Contains(name, "latency"):
+		stats.P95LatencyMS = metric.Value
+	}
+
+	status := service.Status
+	if stats.ErrorRate >= 5 || stats.P95LatencyMS >= 750 {
+		status = "degraded"
+	} else if status == "" {
+		status = "healthy"
+	}
+	s.upsertServiceLocked(Service{ID: service.ID, Name: service.Name, Environment: service.Environment, Region: service.Region, Version: service.Version, Status: status, Stats: stats})
+}
+
+func (s *Store) evaluateMetricAlertLocked(metric Metric) {
+	name := strings.ToLower(metric.Name)
+	entity := firstNonEmpty(metric.Resource.Service, metric.Resource.Host, metric.Name)
+	switch {
+	case strings.Contains(name, "error_rate") && metric.Value >= 5:
+		severity := "warning"
+		if metric.Value >= 10 {
+			severity = "critical"
+		}
+		s.createAlertOnceLocked(Alert{
+			Title:    "High error rate in " + entity,
+			Severity: severity,
+			Source:   "metrics",
+			EntityID: entity,
+			Message:  metric.Name + " is " + formatFloat(metric.Value) + "%",
+			Labels:   map[string]string{"metric": metric.Name},
+		})
+	case (strings.Contains(name, "duration") || strings.Contains(name, "latency")) && strings.EqualFold(metric.Unit, "ms") && metric.Value >= 500:
+		severity := "warning"
+		if metric.Value >= 1000 {
+			severity = "critical"
+		}
+		s.createAlertOnceLocked(Alert{
+			Title:    "High latency in " + entity,
+			Severity: severity,
+			Source:   "metrics",
+			EntityID: entity,
+			Message:  metric.Name + " is " + formatFloat(metric.Value) + " ms",
+			Labels:   map[string]string{"metric": metric.Name},
+		})
+	case strings.Contains(name, "cpu") && strings.EqualFold(metric.Unit, "percent") && metric.Value >= 90:
+		s.createAlertOnceLocked(Alert{
+			Title:    "High CPU on " + entity,
+			Severity: "critical",
+			Source:   "metrics",
+			EntityID: entity,
+			Message:  metric.Name + " is " + formatFloat(metric.Value) + "%",
+			Labels:   map[string]string{"metric": metric.Name},
+		})
+	}
 }
 
 func (s *Store) auditLocked(action, entityType, entityID string, details map[string]string) {
@@ -1010,4 +1156,7 @@ func maskToken(token string) string {
 		return "******"
 	}
 	return token[:3] + "..." + token[len(token)-3:]
+}
+func formatFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', 1, 64)
 }

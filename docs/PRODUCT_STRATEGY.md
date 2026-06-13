@@ -41,7 +41,7 @@ Major Silver gaps:
 
 - Full authentication and user/session UI.
 - Configurable alert rules.
-- Scheduled uptime checks.
+- Uptime history and availability rollups.
 - Notification delivery.
 - OpenTelemetry OTLP ingestion.
 - Real dashboard builder and explorer pages.

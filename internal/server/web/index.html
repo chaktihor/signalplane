@@ -18,10 +18,13 @@
       <nav>
         <a href="#overview">Overview</a>
         <a href="#services">Services</a>
+        <a href="#metrics">Metrics</a>
         <a href="#hosts">Hosts</a>
         <a href="#logs">Logs</a>
         <a href="#traces">Traces</a>
         <a href="#alerts">Alerts</a>
+        <a href="#uptime">Uptime</a>
+        <a href="#incidents">Incidents</a>
       </nav>
     </aside>
 
@@ -30,6 +33,7 @@
         <div>
           <p class="eyebrow">Open observability control plane</p>
           <h1>SignalPlane</h1>
+          <p id="last-updated" class="subtle">Updated --</p>
         </div>
         <div id="health-pill" class="pill">Loading</div>
       </header>
@@ -43,9 +47,20 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Status</th><th>Owner</th><th>p95</th><th>Error rate</th></tr></thead>
+            <thead><tr><th>Name</th><th>Status</th><th>Owner</th><th>Rate</th><th>p95</th><th>Error rate</th></tr></thead>
             <tbody id="services-body"></tbody>
           </table>
+        </div>
+      </section>
+
+      <section class="split">
+        <div class="panel" id="metrics">
+          <div class="section-head"><h2>Recent Metrics</h2></div>
+          <div id="metrics-list" class="list"></div>
+        </div>
+        <div class="panel" id="uptime">
+          <div class="section-head"><h2>Uptime</h2></div>
+          <div id="uptime-list" class="list"></div>
         </div>
       </section>
 
@@ -70,9 +85,13 @@
           <div id="traces-list" class="list"></div>
         </div>
       </section>
+
+      <section class="panel" id="incidents">
+        <div class="section-head"><h2>Incidents</h2></div>
+        <div id="incidents-list" class="list"></div>
+      </section>
     </main>
 
     <script src="/app.js"></script>
   </body>
 </html>
-

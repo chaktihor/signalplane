@@ -28,6 +28,7 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 - [API Reference](docs/API_REFERENCE.md)
 - [Operations Guide](docs/OPERATIONS.md)
 - [Silver Quickstart](docs/SILVER_QUICKSTART.md)
+- [Silver Demo Runbook](docs/SILVER_DEMO_RUNBOOK.md)
 - [Product Strategy](docs/PRODUCT_STRATEGY.md)
 - [Project Structure](docs/PROJECT_STRUCTURE.md)
 - [Product Requirements](docs/PRODUCT_REQUIREMENTS.md)
@@ -91,8 +92,31 @@ Start here:
 - Service and host inference.
 - Error-log and error-trace alert creation.
 - Incident records.
-- Uptime monitor definitions.
+- Uptime monitor definitions and local uptime checks.
+- Demo checkout application that continuously emits logs, metrics, traces, host telemetry, and uptime registration.
 - Example apps for Go, Node.js, Python, C, database/dependency, worker, and Kubernetes-style metadata.
+
+## Run The Silver Demo
+
+Start SignalPlane:
+
+```bash
+SIGNALPLANE_DATA_PATH=data/demo-signalplane.json make run
+```
+
+In another terminal, start the observed demo application:
+
+```bash
+make demo-shop
+```
+
+Generate a visible traffic burst:
+
+```bash
+make demo-traffic
+```
+
+See [Silver Demo Runbook](docs/SILVER_DEMO_RUNBOOK.md) for the full demo sequence.
 
 ## Send First Telemetry
 

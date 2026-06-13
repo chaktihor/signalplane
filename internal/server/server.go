@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"io/fs"
@@ -64,6 +65,10 @@ func (s *Server) HTTPServer() *http.Server {
 
 func (s *Server) Handler() http.Handler { return s.mux }
 
+func (s *Server) StartBackground(ctx context.Context) {
+	go s.uptimeLoop(ctx)
+}
+
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /api/bootstrap", s.bootstrap)
@@ -78,6 +83,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/incidents", s.createIncident)
 	s.mux.HandleFunc("GET /api/uptime-monitors", s.uptimeMonitors)
 	s.mux.HandleFunc("POST /api/uptime-monitors", s.createUptimeMonitor)
+	s.mux.HandleFunc("POST /api/uptime-monitors/{id}/check", s.checkUptimeMonitor)
 	s.mux.HandleFunc("GET /api/tokens", s.tokens)
 	s.mux.HandleFunc("POST /api/tokens", s.createToken)
 	s.mux.HandleFunc("POST /api/ingest/hosts", s.ingestHost)
@@ -158,6 +164,19 @@ func (s *Server) createUptimeMonitor(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"uptimeMonitor": s.store.CreateUptimeMonitor(input)})
 }
+func (s *Server) checkUptimeMonitor(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	monitor, ok := s.store.UptimeMonitor(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "uptime monitor not found")
+		return
+	}
+	result := s.checkUptime(r.Context(), monitor)
+	updated, _ := s.store.RecordUptimeResult(result)
+	writeJSON(w, http.StatusOK, map[string]any{"uptimeMonitor": updated})
+}
 func (s *Server) updateAlert(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizedScope(w, r, "admin") {
 		return
@@ -221,7 +240,7 @@ func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"openapi": "3.1.0",
 		"info":    map[string]string{"title": "SignalPlane Silver API", "version": "0.1.0"},
-		"paths":   []string{"/healthz", "/api/bootstrap", "/api/services", "/api/hosts", "/api/metrics", "/api/logs", "/api/traces", "/api/alerts", "/api/incidents", "/api/uptime-monitors", "/api/tokens", "/api/ingest/hosts", "/api/ingest/metrics", "/api/ingest/logs", "/api/ingest/traces"},
+		"paths":   []string{"/healthz", "/api/bootstrap", "/api/services", "/api/hosts", "/api/metrics", "/api/logs", "/api/traces", "/api/alerts", "/api/incidents", "/api/uptime-monitors", "/api/uptime-monitors/{id}/check", "/api/tokens", "/api/ingest/hosts", "/api/ingest/metrics", "/api/ingest/logs", "/api/ingest/traces"},
 	})
 }
 
@@ -300,4 +319,88 @@ func limitParam(r *http.Request) int {
 		return 100
 	}
 	return value
+}
+
+func (s *Server) uptimeLoop(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.runDueUptimeChecks(ctx)
+		}
+	}
+}
+
+func (s *Server) runDueUptimeChecks(ctx context.Context) {
+	for _, monitor := range s.store.UptimeMonitors(500) {
+		if !uptimeCheckDue(monitor) {
+			continue
+		}
+		result := s.checkUptime(ctx, monitor)
+		if _, ok := s.store.RecordUptimeResult(result); !ok {
+			s.logger.Warn("uptime monitor disappeared before result could be recorded", "id", monitor.ID)
+		}
+	}
+}
+
+func (s *Server) checkUptime(ctx context.Context, monitor store.UptimeMonitor) store.UptimeResult {
+	method := monitor.Method
+	if method == "" {
+		method = http.MethodGet
+	}
+	timeout := time.Duration(monitor.TimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	checkCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	start := time.Now()
+	req, err := http.NewRequestWithContext(checkCtx, method, monitor.URL, nil)
+	if err != nil {
+		return store.UptimeResult{ID: monitor.ID, Status: "down", Error: err.Error(), CheckedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	}
+	resp, err := http.DefaultClient.Do(req)
+	elapsed := float64(time.Since(start).Microseconds()) / 1000
+	if err != nil {
+		return store.UptimeResult{ID: monitor.ID, Status: "down", ResponseMS: elapsed, Error: err.Error(), CheckedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	}
+	defer resp.Body.Close()
+
+	status := "down"
+	errorMessage := ""
+	if resp.StatusCode == monitor.ExpectedStatus {
+		status = "up"
+	} else {
+		errorMessage = "expected status " + strconv.Itoa(monitor.ExpectedStatus) + ", got " + strconv.Itoa(resp.StatusCode)
+	}
+	return store.UptimeResult{
+		ID:         monitor.ID,
+		Status:     status,
+		StatusCode: resp.StatusCode,
+		ResponseMS: elapsed,
+		Error:      errorMessage,
+		CheckedAt:  time.Now().UTC().Format(time.RFC3339Nano),
+	}
+}
+
+func uptimeCheckDue(monitor store.UptimeMonitor) bool {
+	if monitor.URL == "" {
+		return false
+	}
+	if monitor.LastCheckedAt == "" {
+		return true
+	}
+	interval := time.Duration(monitor.IntervalSeconds) * time.Second
+	if interval <= 0 {
+		interval = 60 * time.Second
+	}
+	last, err := time.Parse(time.RFC3339Nano, monitor.LastCheckedAt)
+	if err != nil {
+		return true
+	}
+	return time.Since(last) >= interval
 }

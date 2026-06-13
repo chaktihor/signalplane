@@ -74,3 +74,25 @@ func TestStateChangingEndpointsRequireAdminToken(t *testing.T) {
 		t.Fatalf("expected incident creation with admin token, got %d: %s", resp.Code, resp.Body.String())
 	}
 }
+
+func TestManualUptimeCheck(t *testing.T) {
+	data := store.New()
+	data.CreateUptimeMonitor(store.UptimeMonitor{ID: "upt-test", Name: "test target", URL: "://bad-url", ExpectedStatus: http.StatusOK})
+	app := New(Config{IngestToken: "test-token"}, data, slog.Default())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/uptime-monitors/upt-test/check", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected uptime check 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+
+	monitor, ok := data.UptimeMonitor("upt-test")
+	if !ok {
+		t.Fatal("expected uptime monitor to exist")
+	}
+	if monitor.Status != "down" || monitor.LastError == "" {
+		t.Fatalf("expected down monitor with error, got status=%q error=%q", monitor.Status, monitor.LastError)
+	}
+}

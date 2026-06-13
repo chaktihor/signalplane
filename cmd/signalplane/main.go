@@ -39,6 +39,10 @@ func main() {
 	app := server.New(cfg, data, logger)
 	httpServer := app.HTTPServer()
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	app.StartBackground(ctx)
+
 	go func() {
 		logger.Info("signalplane listening", "addr", cfg.Addr, "ingest_token", cfg.IngestToken)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -47,8 +51,6 @@ func main() {
 		}
 	}()
 
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
 	<-ctx.Done()
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

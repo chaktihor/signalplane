@@ -144,12 +144,15 @@ In the current Silver preview, alerts are created automatically from:
 - `error` logs.
 - `fatal` logs.
 - Error traces.
+- High error-rate metrics.
+- High latency metrics.
+- Failed uptime checks.
 
 Future Silver work will add configurable alert rules.
 
 ### Uptime Monitors
 
-Uptime monitors currently store monitor definitions. Scheduled execution is planned next.
+Uptime monitors store HTTP check definitions and the local SignalPlane process checks due monitors in the background. Each check records status, response time, status code, and consecutive failures.
 
 ## Request Flow
 
@@ -186,7 +189,7 @@ The next Silver improvements should be:
 
 - Configurable alert rules.
 - Webhook/email notification channels.
-- Scheduled uptime checks.
+- Uptime history and availability rollups.
 - Real service detail pages.
 - Better search and filtering.
 - GitHub Actions CI.

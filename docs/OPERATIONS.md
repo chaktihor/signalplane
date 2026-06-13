@@ -183,6 +183,5 @@ The Silver developer preview is not yet production-grade. It uses JSON snapshot 
 - High-volume telemetry storage.
 - Retention policies.
 - Notification delivery.
-- Scheduled uptime execution.
+- Uptime history and availability rollups.
 - OpenTelemetry ingestion.
-

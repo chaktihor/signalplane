@@ -86,3 +86,49 @@ func TestCreateTokenMasksListButValidatesRawToken(t *testing.T) {
 		t.Fatal("listed token should be masked")
 	}
 }
+
+func TestMetricIngestionUpdatesServiceStatsAndCreatesAlert(t *testing.T) {
+	s := New()
+	s.IngestMetrics([]MetricInput{
+		{Name: "http.server.error_rate", Value: 12.5, Unit: "percent", Type: "gauge", Resource: Resource{Service: "checkout-api", Environment: "production"}},
+		{Name: "http.server.duration", Value: 840, Unit: "ms", Type: "histogram", Resource: Resource{Service: "checkout-api", Environment: "production"}},
+	})
+
+	services := s.Services(10)
+	if len(services) != 1 {
+		t.Fatalf("expected one service, got %d", len(services))
+	}
+	if services[0].Status != "degraded" {
+		t.Fatalf("expected degraded service, got %q", services[0].Status)
+	}
+	if services[0].Stats.ErrorRate != 12.5 {
+		t.Fatalf("expected error-rate stat to update, got %f", services[0].Stats.ErrorRate)
+	}
+	if got := s.Summary().Counts.OpenAlerts; got == 0 {
+		t.Fatal("expected metric threshold alert")
+	}
+}
+
+func TestRecordUptimeResultUpdatesMonitorAndCreatesAlert(t *testing.T) {
+	s := New()
+	monitor := s.CreateUptimeMonitor(UptimeMonitor{ID: "upt-demo", Name: "Demo", URL: "http://localhost:8088/healthz", ExpectedStatus: 200})
+
+	updated, ok := s.RecordUptimeResult(UptimeResult{ID: monitor.ID, Status: "down", StatusCode: 503, ResponseMS: 42, Error: "expected status 200, got 503"})
+	if !ok {
+		t.Fatal("expected uptime monitor to update")
+	}
+	if updated.Status != "down" || updated.ConsecutiveFailures != 1 {
+		t.Fatalf("expected down monitor with one failure, got status=%q failures=%d", updated.Status, updated.ConsecutiveFailures)
+	}
+	if got := s.Summary().Counts.OpenAlerts; got != 1 {
+		t.Fatalf("expected one uptime alert, got %d", got)
+	}
+
+	updated, ok = s.RecordUptimeResult(UptimeResult{ID: monitor.ID, Status: "up", StatusCode: 200, ResponseMS: 12})
+	if !ok {
+		t.Fatal("expected uptime monitor to update")
+	}
+	if updated.Status != "up" || updated.ConsecutiveFailures != 0 {
+		t.Fatalf("expected recovered monitor, got status=%q failures=%d", updated.Status, updated.ConsecutiveFailures)
+	}
+}

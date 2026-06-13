@@ -33,7 +33,7 @@ body {
 }
 
 .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-.brand span, .eyebrow { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
+.brand span, .eyebrow, .subtle { color: var(--muted); font-size: 12px; display: block; margin-top: 2px; }
 .mark {
   width: 38px; height: 38px; border-radius: 8px;
   display: grid; place-items: center; font-weight: 800;
@@ -92,6 +92,7 @@ button:hover { border-color: var(--blue); }
 table { width: 100%; border-collapse: collapse; min-width: 620px; }
 th, td { text-align: left; padding: 11px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
 th { color: var(--muted); font-weight: 600; }
+td span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
 
 .list { display: grid; gap: 8px; }
 .item {
@@ -102,12 +103,31 @@ th { color: var(--muted); font-weight: 600; }
 }
 .item strong { display: block; font-size: 13px; margin-bottom: 4px; }
 .item span { color: var(--muted); font-size: 12px; }
+.item.error, .item.critical { border-color: rgba(249, 112, 102, .45); }
+.item.warning { border-color: rgba(244, 189, 80, .45); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: rgba(255, 255, 255, .03);
+  font-size: 11px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.status.healthy, .status.online, .status.up, .status.ok, .status.info { color: var(--green); border-color: rgba(49, 196, 141, .35); }
+.status.degraded, .status.warning { color: var(--yellow); border-color: rgba(244, 189, 80, .4); }
+.status.critical, .status.error, .status.down, .status.fatal { color: var(--red); border-color: rgba(249, 112, 102, .45); }
+.metric-value { float: right; color: var(--text); }
+.error-text { color: var(--red) !important; }
 
 @media (max-width: 920px) {
   body { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; }
-  nav { grid-template-columns: repeat(3, 1fr); }
+  nav { grid-template-columns: repeat(2, 1fr); }
   .metric-grid, .split { grid-template-columns: 1fr; }
 }
-

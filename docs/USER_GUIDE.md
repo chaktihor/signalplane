@@ -211,7 +211,7 @@ curl -X POST http://127.0.0.1:4318/api/uptime-monitors \
   }'
 ```
 
-Scheduled execution is not implemented yet. The current API stores monitor definitions.
+SignalPlane checks due monitors in the background and records the latest status, response code, latency, and failure count.
 
 ## Run The Example Applications
 
@@ -239,7 +239,7 @@ Silver preview does not yet include:
 - Real login/session UI.
 - Configurable alert rules.
 - Notification channels.
-- Scheduled uptime checks.
+- Uptime history and availability rollups.
 - Saved dashboards.
 - OpenTelemetry OTLP ingestion.
 - Production telemetry database.

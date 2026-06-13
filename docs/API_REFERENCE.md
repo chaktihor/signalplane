@@ -229,7 +229,7 @@ curl -X POST http://127.0.0.1:4318/api/incidents \
 
 ### `GET /api/uptime-monitors`
 
-Returns uptime monitor definitions.
+Returns uptime monitor definitions and latest check results.
 
 ```bash
 curl http://127.0.0.1:4318/api/uptime-monitors
@@ -239,13 +239,24 @@ curl http://127.0.0.1:4318/api/uptime-monitors
 
 Requires `admin` token.
 
-Creates an uptime monitor definition.
+Creates an uptime monitor definition. SignalPlane checks due monitors in the background.
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/uptime-monitors \
   -H "Authorization: Bearer dev-token" \
   -H "Content-Type: application/json" \
   -d '{"name":"API health","url":"http://localhost:8080/healthz","expectedStatus":200}'
+```
+
+### `POST /api/uptime-monitors/{id}/check`
+
+Requires `admin` token.
+
+Runs an immediate uptime check and stores the latest result.
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/uptime-monitors/upt-demo-shop/check \
+  -H "Authorization: Bearer dev-token"
 ```
 
 ## Tokens
