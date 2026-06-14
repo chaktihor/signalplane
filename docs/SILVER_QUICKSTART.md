@@ -30,10 +30,10 @@ Override it with:
 SIGNALPLANE_DATA_PATH=/path/to/signalplane.json make run
 ```
 
-## Run With Docker Compose
+## Run With Podman Compose
 
 ```bash
-docker compose up --build
+make stack-up
 ```
 
 Open:
@@ -42,7 +42,7 @@ Open:
 http://127.0.0.1:4318
 ```
 
-Compose persists data in the `signalplane-data` volume.
+Podman Compose persists data in the `signalplane-data` volume.
 
 ## Health Check
 

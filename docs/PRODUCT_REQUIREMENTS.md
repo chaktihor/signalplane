@@ -88,7 +88,7 @@ Needs:
 
 | Capability | Silver | Gold | Platinum |
 |---|---|---|---|
-| Deployment | Docker Compose and single-node Kubernetes | Production Kubernetes, Helm, managed dependencies | Multi-region, HA, tenant isolation, data residency |
+| Deployment | Podman Compose and single-node Kubernetes | Production Kubernetes, Helm, managed dependencies | Multi-region, HA, tenant isolation, data residency |
 | Telemetry | Metrics, logs, traces, events | Metrics, logs, traces, events, RUM, synthetics, profiles | Unified lake for telemetry, sessions, risk, topology, business data |
 | Collection | Linux node agent, OTLP, Prometheus scrape, HTTP logs | Collector fleet, Kubernetes operator, cloud integrations | Fleet control, edge processing, private links, enterprise extensions |
 | Topology | Hosts, services, dependencies | Kubernetes, cloud, process, network, ownership maps | Historical causation graph across technical and business entities |
@@ -123,7 +123,7 @@ Functional requirements:
 - Provide a first-run setup screen.
 - Create the first organization, admin user, and default environment.
 - Show onboarding tasks for metrics, logs, traces, and uptime checks.
-- Provide copyable commands for local Docker Compose, host agent, OpenTelemetry SDK, and log ingestion.
+- Provide copyable commands for local Podman Compose, host agent, OpenTelemetry SDK, and log ingestion.
 - Detect successful telemetry ingestion and mark onboarding steps complete.
 - Provide sample application telemetry for demo mode.
 
@@ -860,7 +860,7 @@ Core entities:
 
 The first implementation should include:
 
-1. Docker Compose local stack.
+1. Podman Compose local stack.
 2. Web UI shell with authentication.
 3. Organization, environment, user, role, and token management.
 4. OTLP trace ingestion.
@@ -920,4 +920,3 @@ Business metrics for hosted offerings:
 - Should the initial license be Apache-2.0 instead of MIT if patent grants matter?
 - How much AI functionality should be included in open source versus optional hosted services?
 - What is the right plugin trust model for community extensions?
-

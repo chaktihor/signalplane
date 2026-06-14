@@ -54,7 +54,9 @@ services:
       - "8025:8025"
 
   signalplane:
-    build: .
+    build:
+      context: .
+      dockerfile: Containerfile
     image: signalplane:dev
     ports:
       - "4318:4318"

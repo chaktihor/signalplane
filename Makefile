@@ -2,6 +2,7 @@
 
 APP := signalplane
 BIN := bin/$(APP)
+CONTAINER_COMPOSE ?= podman compose
 
 run:
 	go run ./cmd/signalplane
@@ -14,16 +15,16 @@ build:
 	go build -trimpath -ldflags="-s -w" -o $(BIN) ./cmd/signalplane
 
 stack-up:
-	docker compose up --build
+	$(CONTAINER_COMPOSE) up --build
 
 stack-down:
-	docker compose down
+	$(CONTAINER_COMPOSE) down
 
 stack-logs:
-	docker compose logs -f
+	$(CONTAINER_COMPOSE) logs -f
 
 stack-reset:
-	docker compose down -v
+	$(CONTAINER_COMPOSE) down -v
 
 demo-shop:
 	go run ./examples/demo-shop

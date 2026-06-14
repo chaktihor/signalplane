@@ -14,7 +14,7 @@ SignalPlane is Silver-demo ready and has the start of the Silver product foundat
 - Local uptime checks.
 - Scoped API tokens.
 - Demo checkout application.
-- Docker Compose platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
+- Podman Compose platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
 - Postgres schema for Silver control-plane metadata.
 - ClickHouse schema for telemetry-scale signal data.
 - Platform dependency health checks in the UI.

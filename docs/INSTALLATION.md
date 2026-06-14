@@ -12,7 +12,7 @@ SignalPlane currently ships as a single Go binary that includes:
 - File-backed persistence using an atomic JSON snapshot for quick local runs.
 - Dependency health checks for the full local Silver platform stack.
 
-The Docker Compose stack also includes:
+The Podman Compose stack also includes:
 
 - PostgreSQL for control-plane metadata.
 - ClickHouse for telemetry-scale signal storage.
@@ -35,8 +35,9 @@ For local source builds:
 
 For containerized runs:
 
-- Docker.
-- Docker Compose.
+- Podman 5 or newer.
+- Podman Compose support through `podman compose`.
+- On macOS, a running Podman machine.
 
 Optional for examples:
 
@@ -90,7 +91,7 @@ Override the bind address:
 SIGNALPLANE_ADDR=0.0.0.0:4318 ./bin/signalplane
 ```
 
-## Option 3: Run The Full Local Stack
+## Option 3: Run The Full Local Stack With Podman
 
 ```bash
 make stack-up
@@ -102,7 +103,7 @@ Open:
 http://127.0.0.1:4318
 ```
 
-Docker Compose starts SignalPlane, PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
+Podman Compose starts SignalPlane, PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
 
 Useful local URLs:
 
@@ -114,7 +115,7 @@ Useful local URLs:
 | OTLP HTTP | `127.0.0.1:4319` |
 | Mailpit | `http://127.0.0.1:8025` |
 
-Docker Compose persists data in named volumes:
+Podman Compose persists data in named volumes:
 
 ```text
 postgres-data
@@ -132,6 +133,19 @@ Remove persisted Compose data:
 
 ```bash
 make stack-reset
+```
+
+On macOS, initialize and start the Podman VM first if needed:
+
+```bash
+podman machine init
+podman machine start
+```
+
+If you need to use Docker-compatible Compose instead, override the command:
+
+```bash
+CONTAINER_COMPOSE="docker compose" make stack-up
 ```
 
 ## Configuration

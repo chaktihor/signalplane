@@ -40,7 +40,7 @@
 | Queue | NATS, Kafka, or Redpanda |
 | Cache | Redis-compatible cache |
 | Object Storage | S3-compatible storage |
-| Deployment | Docker Compose first, Helm second |
+| Deployment | Podman Compose first, Helm second |
 
 ## 4. Ingestion Flow
 
@@ -92,7 +92,7 @@
 
 ### 9.1 Local
 
-- Docker Compose.
+- Podman Compose.
 - Single organization.
 - Default local credentials.
 - Sample data option.
@@ -121,4 +121,3 @@
 - AI-assisted features require trustworthy topology and clean metadata.
 - Session replay and logs introduce privacy risks.
 - Workflow automation requires strong permission and approval boundaries.
-

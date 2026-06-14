@@ -43,13 +43,13 @@ Default local data path:
 data/signalplane.json
 ```
 
-Docker data path inside the container:
+Container data path inside the SignalPlane container:
 
 ```text
 /data/signalplane.json
 ```
 
-Docker Compose volumes:
+Podman Compose volumes:
 
 ```text
 postgres-data
@@ -65,7 +65,7 @@ For local source runs, copy:
 cp data/signalplane.json signalplane-backup.json
 ```
 
-For Docker Compose, copy from the running container or use a volume backup workflow.
+For Podman Compose, copy from the running container or use a volume backup workflow.
 
 ## Restore
 
@@ -91,7 +91,7 @@ Stop SignalPlane, then remove:
 rm -rf data
 ```
 
-For Docker Compose:
+For Podman Compose:
 
 ```bash
 make stack-reset
@@ -121,7 +121,7 @@ This only affects first initialization. Existing data files are loaded as-is.
 SIGNALPLANE_ADDR=0.0.0.0:4318 make run
 ```
 
-For Docker Compose, this is already set inside the container.
+For Podman Compose, this is already set inside the container.
 
 ## Health Checks
 
@@ -176,7 +176,7 @@ For local runs, the default path is:
 data/signalplane.json
 ```
 
-For Docker runs, confirm the `/data` volume is mounted.
+For containerized runs, confirm the `/data` volume is mounted.
 
 ### Dashboard Loads But Counts Do Not Change
 
@@ -193,7 +193,7 @@ curl http://127.0.0.1:4318/api/bootstrap
 Confirm the full stack is running:
 
 ```bash
-docker compose ps
+podman compose ps
 ```
 
 Then inspect dependency logs:

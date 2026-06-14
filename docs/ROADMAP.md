@@ -5,7 +5,7 @@
 The repository now contains a Silver developer preview:
 
 - Single Go binary serving API and web UI.
-- Docker Compose stack.
+- Podman Compose stack.
 - File-backed JSON persistence.
 - Scoped API tokens.
 - HTTP JSON ingestion for metrics, logs, traces, and hosts.
@@ -39,7 +39,7 @@ This baseline proves the local product loop. The next work should make Silver ge
 
 ## Phase 1: Silver MVP
 
-- Docker Compose stack.
+- Podman Compose stack.
 - Web UI shell.
 - Local authentication.
 - Organization and environment model.

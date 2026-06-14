@@ -48,7 +48,7 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 
 ## Status
 
-SignalPlane now has a Silver developer-preview foundation in this repository: a runnable Go service, embedded dashboard, HTTP JSON telemetry ingestion, scoped tokens, file-backed persistence, Docker Compose support, and example telemetry producers.
+SignalPlane now has a Silver developer-preview foundation in this repository: a runnable Go service, embedded dashboard, HTTP JSON telemetry ingestion, scoped tokens, file-backed persistence, Podman Compose support, and example telemetry producers.
 
 The current implementation is not production-grade. It is the baseline for iterating toward the full Silver MVP, then Gold and Platinum capabilities.
 
@@ -64,13 +64,13 @@ make run
 
 Then open `http://127.0.0.1:4318`.
 
-For containerized local installs:
+For containerized local installs with Podman:
 
 ```bash
-docker compose up --build
+make stack-up
 ```
 
-Silver currently persists data to an atomic JSON snapshot. The default local path is `data/signalplane.json`; Docker Compose stores it in a named volume.
+Silver currently persists data to an atomic JSON snapshot. The default local path is `data/signalplane.json`; Podman Compose stores it in a named volume.
 
 Start here:
 
@@ -83,7 +83,7 @@ Start here:
 ## What Works Today
 
 - Single Go binary serving API and UI.
-- Docker Compose install.
+- Podman Compose install.
 - File-backed persistence.
 - Persisted scoped API tokens.
 - Metrics ingestion.

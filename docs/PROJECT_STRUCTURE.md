@@ -25,7 +25,7 @@ This repository is now organized around a runnable Silver developer preview plus
 │   ├── demo-shop
 │   └── test-applications
 ├── docs
-├── Dockerfile
+├── Containerfile
 ├── docker-compose.yml
 ├── Makefile
 └── go.mod
@@ -44,7 +44,7 @@ This repository is now organized around a runnable Silver developer preview plus
 - `deploy/postgres/init`: PostgreSQL schema for Silver control-plane state.
 - `deploy/clickhouse/init`: ClickHouse schema for telemetry signals.
 - `deploy/otel-collector/config.yaml`: local OpenTelemetry Collector receiver config.
-- `docker-compose.yml`: full local Silver stack.
+- `docker-compose.yml`: full local Silver stack, run through Podman Compose by default.
 
 ## Examples
 
@@ -72,7 +72,7 @@ These examples are intentionally dependency-light. They are used to populate the
 - `docs/HOW_IT_WORKS.md`: current Silver runtime behavior.
 - `docs/API_REFERENCE.md`: current HTTP API.
 - `docs/TELEMETRY_GUIDE.md`: telemetry payload conventions.
-- `docs/INSTALLATION.md`: local and Docker install instructions.
+- `docs/INSTALLATION.md`: local and Podman install instructions.
 - `docs/OPERATIONS.md`: operating and troubleshooting the Silver preview.
 - `docs/ROADMAP.md`: phased build plan.
 - `docs/BRAND.md`: naming, positioning, and product voice.

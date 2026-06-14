@@ -21,7 +21,7 @@ Silver is the self-hosted MVP for small teams and early adopters.
 
 Core outcomes:
 
-- Install locally with Docker Compose or a single binary.
+- Install locally with Podman Compose or a single binary.
 - Send logs, metrics, traces, and host telemetry quickly.
 - See inferred services and hosts.
 - Search recent logs and traces.
