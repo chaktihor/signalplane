@@ -17,6 +17,7 @@ SignalPlane is Silver-demo ready and has the start of the Silver product foundat
 - Podman Compose platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
 - Postgres schema for Silver control-plane metadata.
 - ClickHouse schema for telemetry-scale signal data.
+- ClickHouse HTTP telemetry archival for metrics, logs, traces, spans, and uptime results in the platform stack.
 - Platform dependency health checks in the UI.
 
 ## Silver-Ready Acceptance Criteria
@@ -25,9 +26,10 @@ SignalPlane should not be called fully Silver-ready until these are complete:
 
 - Real email/password login and session UI.
 - Organization, user, environment, role, and token management persisted in PostgreSQL.
-- Logs, metrics, traces, spans, events, and uptime results persisted in ClickHouse.
 - OTLP HTTP/gRPC ingestion through the collector or native gateway.
 - Query APIs backed by ClickHouse rather than in-memory JSON snapshots.
+- PostgreSQL-backed API runtime for metadata, tokens, services, hosts, alerts, incidents, dashboards, uptime monitors, notification channels, and audit events.
+- Durable telemetry write failure handling and replay/backfill from the local JSON snapshot into ClickHouse.
 - Configurable alert rules for metrics, logs, traces, and uptime checks.
 - Email, generic webhook, and Slack-compatible webhook notification channels.
 - Dashboard create/edit/clone/delete and JSON import/export.
@@ -61,10 +63,10 @@ make stack-reset
 
 ## Next Implementation Slice
 
-The next Silver-hardening slice should replace the current JSON-backed runtime store with a storage boundary:
+The next Silver-hardening slice should finish durable runtime storage:
 
 - PostgreSQL implementation for organizations, users, tokens, services, hosts, alert rules, alerts, incidents, dashboards, uptime monitors, notification channels, and audit events.
-- ClickHouse writer/query layer for metrics, logs, traces, spans, uptime results, and events.
+- ClickHouse query layer for metrics, logs, traces, spans, uptime results, and events.
 - Migration/version tracking.
 - Backfill/import path from the existing JSON snapshot for local developer continuity.
 

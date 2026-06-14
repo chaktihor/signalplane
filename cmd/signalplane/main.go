@@ -8,12 +8,14 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/chaktihor/signalplane/internal/platform"
 	"github.com/chaktihor/signalplane/internal/server"
 	"github.com/chaktihor/signalplane/internal/store"
+	"github.com/chaktihor/signalplane/internal/telemetry"
 )
 
 func main() {
@@ -28,10 +30,12 @@ func main() {
 		Dependencies: platform.ChecksFromEnv(),
 	}
 
+	telemetrySink := telemetrySinkFromEnv(logger)
 	data, err := store.Open(store.Options{
 		Path:           envString("SIGNALPLANE_DATA_PATH", "data/signalplane.json"),
 		Seed:           envBool("SIGNALPLANE_SEED_DEMO_DATA", true),
 		BootstrapToken: cfg.IngestToken,
+		TelemetrySink:  telemetrySink,
 	})
 	if err != nil {
 		logger.Error("failed to open data store", "error", err)
@@ -62,6 +66,33 @@ func main() {
 		os.Exit(1)
 	}
 	logger.Info("signalplane stopped")
+}
+
+func telemetrySinkFromEnv(logger *slog.Logger) store.TelemetrySink {
+	backend := strings.ToLower(envString("SIGNALPLANE_TELEMETRY_BACKEND", "json"))
+	switch backend {
+	case "", "json", "memory":
+		return nil
+	case "clickhouse":
+		url := envString("SIGNALPLANE_CLICKHOUSE_URL", envString("SIGNALPLANE_CLICKHOUSE_HTTP_URL", ""))
+		sink, err := telemetry.NewClickHouseSink(telemetry.ClickHouseOptions{
+			URL:          url,
+			Database:     envString("SIGNALPLANE_CLICKHOUSE_DATABASE", "signalplane"),
+			Organization: envString("SIGNALPLANE_ORGANIZATION_ID", "org-default"),
+			Username:     envString("SIGNALPLANE_CLICKHOUSE_USER", ""),
+			Password:     envString("SIGNALPLANE_CLICKHOUSE_PASSWORD", ""),
+			Timeout:      envDurationSeconds("SIGNALPLANE_CLICKHOUSE_TIMEOUT_SECONDS", 3),
+		})
+		if err != nil {
+			logger.Warn("clickhouse telemetry sink disabled", "error", err)
+			return nil
+		}
+		logger.Info("clickhouse telemetry sink enabled", "url", url)
+		return sink
+	default:
+		logger.Warn("unsupported telemetry backend, using local json snapshot only", "backend", backend)
+		return nil
+	}
 }
 
 func envString(key, fallback string) string {

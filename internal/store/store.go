@@ -17,6 +17,7 @@ import (
 type Store struct {
 	mu        sync.RWMutex
 	path      string
+	telemetry TelemetrySink
 	org       Organization
 	envs      []Environment
 	tokens    map[string]APIToken
@@ -35,6 +36,14 @@ type Options struct {
 	Path           string
 	Seed           bool
 	BootstrapToken string
+	TelemetrySink  TelemetrySink
+}
+
+type TelemetrySink interface {
+	WriteMetrics([]Metric) error
+	WriteLogs([]Log) error
+	WriteTraces([]Trace) error
+	WriteUptimeResult(UptimeMonitor) error
 }
 
 type snapshot struct {
@@ -330,6 +339,7 @@ func Open(options Options) (*Store, error) {
 		loaded, err := load(options.Path)
 		if err == nil {
 			loaded.path = options.Path
+			loaded.telemetry = options.TelemetrySink
 			loaded.ensureBootstrapToken(options.BootstrapToken)
 			return loaded, loaded.saveLocked()
 		}
@@ -345,6 +355,7 @@ func Open(options Options) (*Store, error) {
 		s = New()
 	}
 	s.path = options.Path
+	s.telemetry = options.TelemetrySink
 	s.ensureBootstrapToken(options.BootstrapToken)
 	if err := s.saveLocked(); err != nil {
 		return nil, err
@@ -569,7 +580,6 @@ func (s *Store) UpsertHost(input HostInput) Host {
 
 func (s *Store) IngestMetrics(inputs []MetricInput) []Metric {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	out := make([]Metric, 0, len(inputs))
 	for _, input := range inputs {
 		resource := normalizeResource(input.Resource)
@@ -585,12 +595,16 @@ func (s *Store) IngestMetrics(inputs []MetricInput) []Metric {
 		out = append(out, metric)
 	}
 	_ = s.saveLocked()
+	sink := s.telemetry
+	s.mu.Unlock()
+	if sink != nil && len(out) > 0 {
+		_ = sink.WriteMetrics(out)
+	}
 	return out
 }
 
 func (s *Store) IngestLogs(inputs []LogInput) []Log {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	out := make([]Log, 0, len(inputs))
 	for _, input := range inputs {
 		resource := normalizeResource(input.Resource)
@@ -610,12 +624,16 @@ func (s *Store) IngestLogs(inputs []LogInput) []Log {
 		}
 	}
 	_ = s.saveLocked()
+	sink := s.telemetry
+	s.mu.Unlock()
+	if sink != nil && len(out) > 0 {
+		_ = sink.WriteLogs(out)
+	}
 	return out
 }
 
 func (s *Store) IngestTraces(inputs []TraceInput) []Trace {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	out := make([]Trace, 0, len(inputs))
 	for _, input := range inputs {
 		traceID := coalesce(input.TraceID, newID("trace"))
@@ -659,6 +677,11 @@ func (s *Store) IngestTraces(inputs []TraceInput) []Trace {
 		}
 	}
 	_ = s.saveLocked()
+	sink := s.telemetry
+	s.mu.Unlock()
+	if sink != nil && len(out) > 0 {
+		_ = sink.WriteTraces(out)
+	}
 	return out
 }
 
@@ -688,9 +711,9 @@ func (s *Store) CreateUptimeMonitor(input UptimeMonitor) UptimeMonitor {
 
 func (s *Store) RecordUptimeResult(result UptimeResult) (UptimeMonitor, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	monitor, ok := s.uptime[result.ID]
 	if !ok {
+		s.mu.Unlock()
 		return UptimeMonitor{}, false
 	}
 	monitor.Status = coalesce(result.Status, "unknown")
@@ -714,6 +737,11 @@ func (s *Store) RecordUptimeResult(result UptimeResult) (UptimeMonitor, bool) {
 	s.uptime[monitor.ID] = monitor
 	s.auditLocked("uptime.checked", "uptimeMonitor", monitor.ID, map[string]string{"status": monitor.Status})
 	_ = s.saveLocked()
+	sink := s.telemetry
+	s.mu.Unlock()
+	if sink != nil {
+		_ = sink.WriteUptimeResult(monitor)
+	}
 	return monitor, true
 }
 

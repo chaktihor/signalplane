@@ -28,4 +28,4 @@ Start here if you are installing, evaluating, or operating SignalPlane.
 - [Silver Demo Runbook](SILVER_DEMO_RUNBOOK.md)
 - [Silver Readiness](SILVER_READINESS.md)
 
-The Silver preview is a self-hosted developer preview with a Go API server, embedded dashboard, JSON telemetry ingestion, scoped tokens, file-backed persistence, local uptime checks, and a live demo checkout application.
+The Silver preview is a self-hosted developer preview with a Go API server, embedded dashboard, JSON telemetry ingestion, scoped tokens, file-backed runtime persistence, optional ClickHouse telemetry archival in the Podman stack, local uptime checks, and a live demo checkout application.

@@ -158,8 +158,14 @@ SignalPlane is configured with environment variables.
 | `SIGNALPLANE_INGEST_TOKEN` | `dev-token` | Local bootstrap/admin token |
 | `SIGNALPLANE_DATA_PATH` | `data/signalplane.json` | File-backed persistence path |
 | `SIGNALPLANE_SEED_DEMO_DATA` | `true` | Seed demo services, metrics, logs, traces, and uptime monitor |
-| `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime store backend; PostgreSQL implementation is the next Silver-hardening slice |
+| `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime metadata/control-plane store backend; PostgreSQL runtime wiring is still pending |
+| `SIGNALPLANE_TELEMETRY_BACKEND` | `json` | Telemetry archival backend. Use `clickhouse` with the local platform stack |
 | `SIGNALPLANE_POSTGRES_ADDR` | empty | Optional dependency health check target |
+| `SIGNALPLANE_CLICKHOUSE_URL` | empty | ClickHouse HTTP endpoint used when `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse` |
+| `SIGNALPLANE_CLICKHOUSE_DATABASE` | `signalplane` | ClickHouse database for telemetry archival |
+| `SIGNALPLANE_CLICKHOUSE_USER` | empty | Optional ClickHouse HTTP user |
+| `SIGNALPLANE_CLICKHOUSE_PASSWORD` | empty | Optional ClickHouse HTTP password |
+| `SIGNALPLANE_CLICKHOUSE_TIMEOUT_SECONDS` | `3` | ClickHouse write timeout |
 | `SIGNALPLANE_CLICKHOUSE_HTTP_URL` | empty | Optional ClickHouse health check URL |
 | `SIGNALPLANE_OTEL_GRPC_ADDR` | empty | Optional OTLP gRPC dependency health check target |
 | `SIGNALPLANE_OTEL_HTTP_ADDR` | empty | Optional OTLP HTTP dependency health check target |
@@ -202,7 +208,7 @@ This file stores:
 - Uptime monitors.
 - Audit events.
 
-The full local stack now provisions PostgreSQL and ClickHouse schemas. The current runtime still uses JSON persistence until the next Silver-hardening slice wires the store interface into those databases.
+The full local stack provisions PostgreSQL and ClickHouse schemas. The current runtime still uses JSON persistence for metadata and API query state. When `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`, SignalPlane also archives incoming metrics, logs, traces, spans, and uptime results into ClickHouse over HTTP. PostgreSQL-backed metadata runtime wiring is still pending.
 
 ## Verify Installation
 

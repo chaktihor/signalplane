@@ -242,4 +242,4 @@ Silver preview does not yet include:
 - Uptime history and availability rollups.
 - Saved dashboards.
 - OpenTelemetry OTLP ingestion.
-- Production telemetry database.
+- ClickHouse-backed query APIs, production retention controls, and replay handling.
