@@ -259,6 +259,16 @@ curl -X POST http://127.0.0.1:4318/api/uptime-monitors/upt-demo-shop/check \
   -H "Authorization: Bearer dev-token"
 ```
 
+## System Dependencies
+
+### `GET /api/system/dependencies`
+
+Returns health checks for configured local platform dependencies such as PostgreSQL, ClickHouse, OpenTelemetry Collector, SMTP, and Mailpit.
+
+```bash
+curl http://127.0.0.1:4318/api/system/dependencies
+```
+
 ## Tokens
 
 ### `GET /api/tokens`

@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/chaktihor/signalplane/internal/platform"
 	"github.com/chaktihor/signalplane/internal/server"
 	"github.com/chaktihor/signalplane/internal/store"
 )
@@ -24,6 +25,7 @@ func main() {
 		ReadTimeout:  envDurationSeconds("SIGNALPLANE_READ_TIMEOUT_SECONDS", 5),
 		WriteTimeout: envDurationSeconds("SIGNALPLANE_WRITE_TIMEOUT_SECONDS", 10),
 		IdleTimeout:  envDurationSeconds("SIGNALPLANE_IDLE_TIMEOUT_SECONDS", 60),
+		Dependencies: platform.ChecksFromEnv(),
 	}
 
 	data, err := store.Open(store.Options{

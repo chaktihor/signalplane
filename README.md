@@ -29,6 +29,7 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 - [Operations Guide](docs/OPERATIONS.md)
 - [Silver Quickstart](docs/SILVER_QUICKSTART.md)
 - [Silver Demo Runbook](docs/SILVER_DEMO_RUNBOOK.md)
+- [Silver Readiness](docs/SILVER_READINESS.md)
 - [Product Strategy](docs/PRODUCT_STRATEGY.md)
 - [Project Structure](docs/PROJECT_STRUCTURE.md)
 - [Product Requirements](docs/PRODUCT_REQUIREMENTS.md)
@@ -98,6 +99,14 @@ Start here:
 
 ## Run The Silver Demo
 
+Run the full local platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, Mailpit, and SignalPlane:
+
+```bash
+make stack-up
+```
+
+For a fast single-process demo without dependency containers:
+
 Start SignalPlane:
 
 ```bash
@@ -117,6 +126,8 @@ make demo-traffic
 ```
 
 See [Silver Demo Runbook](docs/SILVER_DEMO_RUNBOOK.md) for the full demo sequence.
+
+See [Silver Readiness](docs/SILVER_READINESS.md) for the remaining work before this should be called a full Silver product release.
 
 ## Send First Telemetry
 

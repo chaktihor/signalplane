@@ -121,6 +121,16 @@ function renderIncidents(incidents) {
   `).join("") : empty("No incidents", "Create incidents from alerts or manual response work.");
 }
 
+function renderDependencies(dependencies) {
+  $("#dependencies-list").innerHTML = dependencies.length ? dependencies.map((dependency) => `
+    <div class="dependency">
+      <strong>${text(dependency.name)} ${badge(dependency.status)}</strong>
+      <span>${text(dependency.kind)} - ${text(dependency.target)} - ${number(dependency.latencyMs)} ms</span>
+      ${dependency.error ? `<span class="error-text">${text(dependency.error)}</span>` : ""}
+    </div>
+  `).join("") : empty("No dependency checks", "Set dependency environment variables to monitor the local platform stack.");
+}
+
 function empty(title, body) {
   return `<div class="item"><strong>${text(title)}</strong><span>${text(body)}</span></div>`;
 }
@@ -140,7 +150,7 @@ function time(value) {
 }
 
 async function refresh() {
-  const [bootstrap, services, hosts, alerts, logs, traces, metrics, uptime, incidents] = await Promise.all([
+  const [bootstrap, services, hosts, alerts, logs, traces, metrics, uptime, incidents, dependencies] = await Promise.all([
     getJSON("/api/bootstrap"),
     getJSON("/api/services"),
     getJSON("/api/hosts"),
@@ -149,7 +159,8 @@ async function refresh() {
     getJSON("/api/traces?limit=10"),
     getJSON("/api/metrics?limit=10"),
     getJSON("/api/uptime-monitors"),
-    getJSON("/api/incidents")
+    getJSON("/api/incidents"),
+    getJSON("/api/system/dependencies")
   ]);
   setHealth(bootstrap.health);
   renderCounts(bootstrap.counts);
@@ -161,6 +172,7 @@ async function refresh() {
   renderMetrics(metrics.metrics);
   renderUptime(uptime.uptimeMonitors);
   renderIncidents(incidents.incidents);
+  renderDependencies(dependencies.dependencies);
   $("#last-updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 

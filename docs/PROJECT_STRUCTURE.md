@@ -7,6 +7,8 @@ This repository is now organized around a runnable Silver developer preview plus
 ├── cmd/signalplane
 │   └── main.go
 ├── internal
+│   ├── platform
+│   │   └── dependencies.go
 │   ├── server
 │   │   ├── server.go
 │   │   └── web
@@ -15,7 +17,13 @@ This repository is now organized around a runnable Silver developer preview plus
 │   │       └── styles.css
 │   └── store
 │       └── store.go
-├── examples/test-applications
+├── deploy
+│   ├── clickhouse
+│   ├── otel-collector
+│   └── postgres
+├── examples
+│   ├── demo-shop
+│   └── test-applications
 ├── docs
 ├── Dockerfile
 ├── docker-compose.yml
@@ -26,11 +34,21 @@ This repository is now organized around a runnable Silver developer preview plus
 ## Runtime
 
 - `cmd/signalplane`: process entry point, environment configuration, store initialization, and graceful shutdown.
+- `internal/platform`: local dependency health checks for PostgreSQL, ClickHouse, OpenTelemetry Collector, SMTP, and Mailpit.
 - `internal/server`: HTTP API, auth checks, embedded static web UI, and request/response handling.
 - `internal/server/web`: lightweight Silver dashboard.
 - `internal/store`: in-memory domain model, JSON snapshot persistence, token validation, service/host inference, telemetry ingestion, alert creation, and audit events.
 
+## Deployment
+
+- `deploy/postgres/init`: PostgreSQL schema for Silver control-plane state.
+- `deploy/clickhouse/init`: ClickHouse schema for telemetry signals.
+- `deploy/otel-collector/config.yaml`: local OpenTelemetry Collector receiver config.
+- `docker-compose.yml`: full local Silver stack.
+
 ## Examples
+
+`examples/demo-shop` is the main observed demo application. It sends logs, metrics, traces, host heartbeats, and uptime registration to SignalPlane.
 
 `examples/test-applications` contains small telemetry producers for common workloads:
 
@@ -48,6 +66,7 @@ These examples are intentionally dependency-light. They are used to populate the
 ## Documentation
 
 - `docs/PRODUCT_STRATEGY.md`: tiered product strategy and Dynatrace-equivalent intent.
+- `docs/SILVER_READINESS.md`: checklist for calling the product fully Silver-ready.
 - `docs/PRODUCT_REQUIREMENTS.md`: full Silver, Gold, and Platinum requirements.
 - `docs/ARCHITECTURE.md`: long-term logical architecture.
 - `docs/HOW_IT_WORKS.md`: current Silver runtime behavior.

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/chaktihor/signalplane/internal/platform"
 	"github.com/chaktihor/signalplane/internal/store"
 )
 
@@ -94,5 +95,28 @@ func TestManualUptimeCheck(t *testing.T) {
 	}
 	if monitor.Status != "down" || monitor.LastError == "" {
 		t.Fatalf("expected down monitor with error, got status=%q error=%q", monitor.Status, monitor.LastError)
+	}
+}
+
+func TestDependencyEndpoint(t *testing.T) {
+	app := New(Config{Dependencies: []platform.DependencyCheck{{ID: "bad", Name: "Bad TCP", Kind: "tcp", Target: "127.0.0.1:1"}}}, store.New(), slog.Default())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/system/dependencies", nil)
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected dependency endpoint 200, got %d", resp.Code)
+	}
+	var body struct {
+		Dependencies []platform.DependencyStatus `json:"dependencies"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode dependency response: %v", err)
+	}
+	if len(body.Dependencies) != 1 {
+		t.Fatalf("expected one dependency status, got %d", len(body.Dependencies))
+	}
+	if body.Dependencies[0].Status != "down" {
+		t.Fatalf("expected dependency to be down, got %q", body.Dependencies[0].Status)
 	}
 }

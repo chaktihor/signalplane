@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/chaktihor/signalplane/internal/platform"
 	"github.com/chaktihor/signalplane/internal/store"
 )
 
@@ -23,6 +24,7 @@ type Config struct {
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 	IdleTimeout  time.Duration
+	Dependencies []platform.DependencyCheck
 }
 
 type Server struct {
@@ -84,6 +86,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/uptime-monitors", s.uptimeMonitors)
 	s.mux.HandleFunc("POST /api/uptime-monitors", s.createUptimeMonitor)
 	s.mux.HandleFunc("POST /api/uptime-monitors/{id}/check", s.checkUptimeMonitor)
+	s.mux.HandleFunc("GET /api/system/dependencies", s.dependencies)
 	s.mux.HandleFunc("GET /api/tokens", s.tokens)
 	s.mux.HandleFunc("POST /api/tokens", s.createToken)
 	s.mux.HandleFunc("POST /api/ingest/hosts", s.ingestHost)
@@ -127,6 +130,11 @@ func (s *Server) incidents(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) uptimeMonitors(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"uptimeMonitors": s.store.UptimeMonitors(limitParam(r))})
+}
+func (s *Server) dependencies(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	writeJSON(w, http.StatusOK, map[string]any{"dependencies": platform.CheckAll(ctx, s.cfg.Dependencies)})
 }
 func (s *Server) tokens(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizedScope(w, r, "admin") {
@@ -240,7 +248,7 @@ func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"openapi": "3.1.0",
 		"info":    map[string]string{"title": "SignalPlane Silver API", "version": "0.1.0"},
-		"paths":   []string{"/healthz", "/api/bootstrap", "/api/services", "/api/hosts", "/api/metrics", "/api/logs", "/api/traces", "/api/alerts", "/api/incidents", "/api/uptime-monitors", "/api/uptime-monitors/{id}/check", "/api/tokens", "/api/ingest/hosts", "/api/ingest/metrics", "/api/ingest/logs", "/api/ingest/traces"},
+		"paths":   []string{"/healthz", "/api/bootstrap", "/api/services", "/api/hosts", "/api/metrics", "/api/logs", "/api/traces", "/api/alerts", "/api/incidents", "/api/uptime-monitors", "/api/uptime-monitors/{id}/check", "/api/system/dependencies", "/api/tokens", "/api/ingest/hosts", "/api/ingest/metrics", "/api/ingest/logs", "/api/ingest/traces"},
 	})
 }
 

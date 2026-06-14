@@ -9,7 +9,15 @@ SignalPlane currently ships as a single Go binary that includes:
 - HTTP API server.
 - Embedded web dashboard.
 - Metrics, logs, traces, host, service, alert, incident, uptime, and token APIs.
-- File-backed persistence using an atomic JSON snapshot.
+- File-backed persistence using an atomic JSON snapshot for quick local runs.
+- Dependency health checks for the full local Silver platform stack.
+
+The Docker Compose stack also includes:
+
+- PostgreSQL for control-plane metadata.
+- ClickHouse for telemetry-scale signal storage.
+- OpenTelemetry Collector for OTLP intake ports.
+- Mailpit for email notification testing.
 
 The default local URL is:
 
@@ -82,10 +90,10 @@ Override the bind address:
 SIGNALPLANE_ADDR=0.0.0.0:4318 ./bin/signalplane
 ```
 
-## Option 3: Run With Docker Compose
+## Option 3: Run The Full Local Stack
 
 ```bash
-docker compose up --build
+make stack-up
 ```
 
 Open:
@@ -94,22 +102,36 @@ Open:
 http://127.0.0.1:4318
 ```
 
-Docker Compose persists data in the named volume:
+Docker Compose starts SignalPlane, PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
+
+Useful local URLs:
+
+| Service | URL |
+|---|---|
+| SignalPlane | `http://127.0.0.1:4318` |
+| ClickHouse HTTP | `http://127.0.0.1:8123` |
+| OTLP gRPC | `127.0.0.1:4317` |
+| OTLP HTTP | `127.0.0.1:4319` |
+| Mailpit | `http://127.0.0.1:8025` |
+
+Docker Compose persists data in named volumes:
 
 ```text
+postgres-data
+clickhouse-data
 signalplane-data
 ```
 
-Stop SignalPlane:
+Stop the stack:
 
 ```bash
-docker compose down
+make stack-down
 ```
 
 Remove persisted Compose data:
 
 ```bash
-docker compose down -v
+make stack-reset
 ```
 
 ## Configuration
@@ -122,6 +144,13 @@ SignalPlane is configured with environment variables.
 | `SIGNALPLANE_INGEST_TOKEN` | `dev-token` | Local bootstrap/admin token |
 | `SIGNALPLANE_DATA_PATH` | `data/signalplane.json` | File-backed persistence path |
 | `SIGNALPLANE_SEED_DEMO_DATA` | `true` | Seed demo services, metrics, logs, traces, and uptime monitor |
+| `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime store backend; PostgreSQL implementation is the next Silver-hardening slice |
+| `SIGNALPLANE_POSTGRES_ADDR` | empty | Optional dependency health check target |
+| `SIGNALPLANE_CLICKHOUSE_HTTP_URL` | empty | Optional ClickHouse health check URL |
+| `SIGNALPLANE_OTEL_GRPC_ADDR` | empty | Optional OTLP gRPC dependency health check target |
+| `SIGNALPLANE_OTEL_HTTP_ADDR` | empty | Optional OTLP HTTP dependency health check target |
+| `SIGNALPLANE_SMTP_ADDR` | empty | Optional SMTP dependency health check target |
+| `SIGNALPLANE_MAILPIT_URL` | empty | Optional Mailpit web health check URL |
 | `SIGNALPLANE_READ_TIMEOUT_SECONDS` | `5` | HTTP read timeout |
 | `SIGNALPLANE_WRITE_TIMEOUT_SECONDS` | `10` | HTTP write timeout |
 | `SIGNALPLANE_IDLE_TIMEOUT_SECONDS` | `60` | HTTP idle timeout |
@@ -159,7 +188,7 @@ This file stores:
 - Uptime monitors.
 - Audit events.
 
-This is good enough for the Silver developer preview. Future tiers should move to a proper database and telemetry storage backend.
+The full local stack now provisions PostgreSQL and ClickHouse schemas. The current runtime still uses JSON persistence until the next Silver-hardening slice wires the store interface into those databases.
 
 ## Verify Installation
 
@@ -187,6 +216,12 @@ curl http://127.0.0.1:4318/api/bootstrap
 
 You should see counts for services, hosts, metrics, logs, traces, alerts, tokens, incidents, and uptime monitors.
 
+Dependency health API:
+
+```bash
+curl http://127.0.0.1:4318/api/system/dependencies
+```
+
 ## Next Step
 
 After installation, read:
@@ -194,4 +229,3 @@ After installation, read:
 - [User Guide](USER_GUIDE.md)
 - [Telemetry Guide](TELEMETRY_GUIDE.md)
 - [API Reference](API_REFERENCE.md)
-

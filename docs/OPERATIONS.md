@@ -17,16 +17,22 @@ make build
 ./bin/signalplane
 ```
 
-Run with Docker Compose:
+Run the full local stack:
 
 ```bash
-docker compose up --build
+make stack-up
 ```
 
-Stop Compose:
+Stop the stack:
 
 ```bash
-docker compose down
+make stack-down
+```
+
+Follow stack logs:
+
+```bash
+make stack-logs
 ```
 
 ## Data Location
@@ -43,9 +49,11 @@ Docker data path inside the container:
 /data/signalplane.json
 ```
 
-Docker Compose volume:
+Docker Compose volumes:
 
 ```text
+postgres-data
+clickhouse-data
 signalplane-data
 ```
 
@@ -86,7 +94,7 @@ rm -rf data
 For Docker Compose:
 
 ```bash
-docker compose down -v
+make stack-reset
 ```
 
 ## Change The Bootstrap Token
@@ -119,6 +127,12 @@ For Docker Compose, this is already set inside the container.
 
 ```bash
 curl http://127.0.0.1:4318/healthz
+```
+
+Check configured platform dependencies:
+
+```bash
+curl http://127.0.0.1:4318/api/system/dependencies
 ```
 
 ## Troubleshooting
@@ -174,13 +188,29 @@ Check bootstrap counts:
 curl http://127.0.0.1:4318/api/bootstrap
 ```
 
+### Platform Dependency Shows Down
+
+Confirm the full stack is running:
+
+```bash
+docker compose ps
+```
+
+Then inspect dependency logs:
+
+```bash
+make stack-logs
+```
+
+For source runs, dependency checks only appear when the corresponding `SIGNALPLANE_*` dependency environment variables are set.
+
 ## Production Caveat
 
 The Silver developer preview is not yet production-grade. It uses JSON snapshot persistence and does not yet have:
 
 - Full user login.
 - Full RBAC.
-- High-volume telemetry storage.
+- Runtime writes to PostgreSQL and ClickHouse.
 - Retention policies.
 - Notification delivery.
 - Uptime history and availability rollups.

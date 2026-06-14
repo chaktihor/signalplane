@@ -11,6 +11,7 @@ Start here if you are installing, evaluating, or operating SignalPlane.
 5. [API Reference](API_REFERENCE.md)
 6. [Operations Guide](OPERATIONS.md)
 7. [Silver Demo Runbook](SILVER_DEMO_RUNBOOK.md)
+8. [Silver Readiness](SILVER_READINESS.md)
 
 ## Product Planning
 
@@ -25,5 +26,6 @@ Start here if you are installing, evaluating, or operating SignalPlane.
 
 - [Silver Quickstart](SILVER_QUICKSTART.md)
 - [Silver Demo Runbook](SILVER_DEMO_RUNBOOK.md)
+- [Silver Readiness](SILVER_READINESS.md)
 
 The Silver preview is a self-hosted developer preview with a Go API server, embedded dashboard, JSON telemetry ingestion, scoped tokens, file-backed persistence, local uptime checks, and a live demo checkout application.

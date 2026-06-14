@@ -88,6 +88,7 @@ button {
 button:hover { border-color: var(--blue); }
 
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dependency-grid { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 10px; }
 .table-wrap { overflow: auto; }
 table { width: 100%; border-collapse: collapse; min-width: 620px; }
 th, td { text-align: left; padding: 11px 8px; border-bottom: 1px solid var(--line); font-size: 13px; }
@@ -101,8 +102,15 @@ td span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px;
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-.item strong { display: block; font-size: 13px; margin-bottom: 4px; }
-.item span { color: var(--muted); font-size: 12px; }
+.dependency {
+  padding: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.item strong, .dependency strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.item span, .dependency span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .item.error, .item.critical { border-color: rgba(249, 112, 102, .45); }
 .item.warning { border-color: rgba(244, 189, 80, .45); }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
@@ -129,5 +137,5 @@ td span { display: block; color: var(--muted); font-size: 12px; margin-top: 3px;
   body { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; }
   nav { grid-template-columns: repeat(2, 1fr); }
-  .metric-grid, .split { grid-template-columns: 1fr; }
+  .metric-grid, .split, .dependency-grid { grid-template-columns: 1fr; }
 }
