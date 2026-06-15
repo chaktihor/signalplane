@@ -170,6 +170,21 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	if !operationHasScope(notificationList, "admin") {
 		t.Fatal("expected notification channel list operation to require admin scope")
 	}
+	for _, path := range []string{"/v1/logs", "/v1/metrics", "/v1/traces"} {
+		operation := paths[path].(map[string]any)["post"].(map[string]any)
+		responses := operation["responses"].(map[string]any)
+		if _, ok := responses["200"]; !ok {
+			t.Fatalf("expected %s to document protobuf 200 success", path)
+		}
+		if _, ok := responses["202"]; !ok {
+			t.Fatalf("expected %s to document JSON 202 accepted success", path)
+		}
+		response200 := responses["200"].(map[string]any)
+		content := response200["content"].(map[string]any)
+		if _, ok := content["application/x-protobuf"]; !ok {
+			t.Fatalf("expected %s 200 response to document application/x-protobuf", path)
+		}
+	}
 	components := body["components"].(map[string]any)
 	schemas := components["schemas"].(map[string]any)
 	for _, schema := range []string{"LogInput", "Log", "MetricInput", "TraceInput", "Error"} {

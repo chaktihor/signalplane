@@ -134,7 +134,7 @@ func patchOp(summary, description, scope, requestSchema string, responses ...map
 }
 
 func otlpOp(summary, description string) map[string]any {
-	operation := op("post", summary, description, "ingest", "", refResponse("202", "OTLPAcceptedResponse"), emptyResponse("400"), emptyResponse("401"), emptyResponse("415"))
+	operation := op("post", summary, description, "ingest", "", otlpProtobufResponse(), refResponse("202", "OTLPAcceptedResponse"), emptyResponse("400"), emptyResponse("401"), emptyResponse("415"))
 	operation["operation"].(map[string]any)["requestBody"] = map[string]any{
 		"required": true,
 		"content": map[string]any{
@@ -143,6 +143,19 @@ func otlpOp(summary, description string) map[string]any {
 		},
 	}
 	return operation
+}
+
+func otlpProtobufResponse() map[string]any {
+	return map[string]any{
+		"200": map[string]any{
+			"description": "OTLP protobuf accepted. SignalPlane returns HTTP 200 with an OTLP protobuf response envelope for protobuf requests.",
+			"content": map[string]any{
+				"application/x-protobuf": map[string]any{
+					"schema": map[string]any{"type": "string", "contentEncoding": "base64"},
+				},
+			},
+		},
+	}
 }
 
 func op(method, summary, description, scope, requestSchema string, responses ...map[string]any) map[string]any {
