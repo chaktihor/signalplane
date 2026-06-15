@@ -107,15 +107,17 @@ For Podman Compose:
 make stack-reset
 ```
 
-## Change The Bootstrap Token
+## Change Local Tokens
 
-Set:
+Set a dedicated ingest token for collectors and, when needed, a separate admin token for automation:
 
 ```bash
-SIGNALPLANE_INGEST_TOKEN=change-me make run
+SIGNALPLANE_INGEST_TOKEN=change-ingest-me \
+SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN=change-admin-me \
+make run
 ```
 
-The bootstrap token is persisted as an admin token. If the data file already exists, SignalPlane adds the configured bootstrap token if it is not already present.
+The ingest token is not accepted by read or admin APIs. `SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN` is persisted as an admin-scoped token if it is configured and not already present.
 
 ## Disable Demo Data
 
@@ -173,7 +175,7 @@ Check tokens:
 
 ```bash
 curl http://127.0.0.1:4318/api/tokens \
-  -H "Authorization: Bearer dev-token"
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### Data Does Not Persist

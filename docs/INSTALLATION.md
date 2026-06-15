@@ -77,10 +77,14 @@ Open:
 http://127.0.0.1:4318
 ```
 
-Default local bootstrap token:
+For source runs, set an ingest token and either a bootstrap owner user or admin token:
 
-```text
-dev-token
+```bash
+SIGNALPLANE_INGEST_TOKEN=dev-token \
+SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN=dev-admin-token \
+SIGNALPLANE_BOOTSTRAP_USER_EMAIL=admin@signalplane.local \
+SIGNALPLANE_BOOTSTRAP_USER_PASSWORD=admin-password \
+make run
 ```
 
 ## Option 2: Build The Binary
@@ -192,9 +196,11 @@ SignalPlane is configured with environment variables.
 | Variable | Default | Purpose |
 |---|---|---|
 | `SIGNALPLANE_ADDR` | `127.0.0.1:4318` | Address and port for the HTTP server |
-| `SIGNALPLANE_INGEST_TOKEN` | `dev-token` | Local bootstrap/admin token |
+| `SIGNALPLANE_INGEST_TOKEN` | empty | Ingest-only token accepted by telemetry endpoints. Local Podman Compose sets `dev-token` |
+| `SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN` | empty | Optional admin-scoped token created at startup for local automation. Local Podman Compose sets `dev-admin-token` |
 | `SIGNALPLANE_BOOTSTRAP_USER_EMAIL` | empty | Optional local owner account email created at startup |
 | `SIGNALPLANE_BOOTSTRAP_USER_PASSWORD` | empty | Optional local owner account password created at startup |
+| `SIGNALPLANE_REQUIRE_READ_AUTH` | `true` | Require read/admin token or login session for telemetry read APIs |
 | `SIGNALPLANE_DATA_PATH` | `data/signalplane.json` | File-backed persistence path |
 | `SIGNALPLANE_SEED_DEMO_DATA` | `true` | Seed demo services, metrics, logs, traces, and uptime monitor |
 | `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime store backend. Use `json` for a local snapshot or `postgres` for PostgreSQL-backed runtime state |

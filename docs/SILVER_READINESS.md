@@ -18,7 +18,7 @@ SignalPlane is Silver-ready for local self-hosted pilots and demos:
 - Scoped API tokens.
 - Local user login sessions, roles, and user-management APIs.
 - Demo checkout application.
-- Podman Compose platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
+- Podman Compose platform stack with PostgreSQL, ClickHouse, OpenTelemetry gateway collector, node-local log-agent collector, demo log writer, and Mailpit.
 - Kubernetes Helm chart for SignalPlane API/UI deployment with probes, secrets, ingress, PDB, optional HPA, network policy, and per-replica replay PVCs.
 - Postgres schema for Silver control-plane metadata.
 - PostgreSQL-backed runtime snapshot persistence in the platform stack.
@@ -26,6 +26,7 @@ SignalPlane is Silver-ready for local self-hosted pilots and demos:
 - ClickHouse HTTP telemetry archival for metrics, logs, traces, spans, and uptime results in the platform stack.
 - ClickHouse-backed telemetry query APIs with runtime fallback.
 - Durable local telemetry replay queue for failed ClickHouse writes.
+- Node-local log-agent profile that tails app log files, enriches resource metadata, batches, retries, compresses, and forwards through the gateway collector.
 - Platform dependency health checks in the UI.
 - On-prem, HA, air-gapped, cloud capacity, end-user, and operator documentation.
 
@@ -57,7 +58,9 @@ Services:
 | SignalPlane | Product API and UI | `http://127.0.0.1:4318` |
 | PostgreSQL | Metadata/control-plane store | `127.0.0.1:5432` |
 | ClickHouse | Telemetry store | `http://127.0.0.1:8123` |
-| OpenTelemetry Collector | OTLP receiver | `127.0.0.1:4317`, `127.0.0.1:4319` |
+| OpenTelemetry gateway collector | OTLP receiver and forwarder | `127.0.0.1:4317`, `127.0.0.1:4319` |
+| SignalPlane log agent | Local file/stdout-style log collector | internal |
+| Demo log writer | Generates newline JSON app logs for the log agent | internal |
 | Mailpit | Email notification sink | `http://127.0.0.1:8025` |
 
 Reset local stack state:

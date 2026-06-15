@@ -171,11 +171,13 @@ Uptime monitors store HTTP check definitions and the local SignalPlane process c
 
 Silver has local users, login sessions, and API tokens:
 
-- `dev-token` is the default local bootstrap/admin token.
+- `SIGNALPLANE_INGEST_TOKEN` is accepted only by ingestion endpoints.
+- `SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN` optionally creates an admin-scoped token for local automation.
 - `SIGNALPLANE_BOOTSTRAP_USER_EMAIL` and `SIGNALPLANE_BOOTSTRAP_USER_PASSWORD` create the first owner account.
 - Tokens are persisted.
 - Tokens have scopes: `admin`, `ingest`, or `read`.
 - Users have roles: `owner`, `admin`, `editor`, or `viewer`.
+- Read APIs require a read/admin token or login session when `SIGNALPLANE_REQUIRE_READ_AUTH=true`.
 - Ingestion endpoints require a valid token.
 - Token management endpoints require admin access.
 - Alert status updates, incident creation, and uptime monitor creation require admin access.

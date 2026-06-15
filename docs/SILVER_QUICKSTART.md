@@ -70,11 +70,11 @@ curl -X POST http://127.0.0.1:4318/api/ingest/logs \
 
 ## Create An Ingestion Token
 
-The default `dev-token` is a local admin/bootstrap token. Use it to create scoped tokens for collectors:
+Use an admin token or owner login session to create scoped collector tokens. The local Podman stack bootstraps `dev-admin-token` for admin automation:
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/tokens \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "orders-collector",
@@ -87,7 +87,7 @@ List tokens:
 
 ```bash
 curl http://127.0.0.1:4318/api/tokens \
-  -H "Authorization: Bearer dev-token"
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ## Ingest A Metric

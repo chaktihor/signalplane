@@ -52,7 +52,7 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 
 ## Status
 
-SignalPlane now has a Silver self-hosted product baseline in this repository: a runnable Go service, embedded dashboard, HTTP JSON and OTLP HTTP JSON/protobuf telemetry ingestion, login sessions, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival and query APIs, alert rules, notification channels, replay handling, Helm deployment assets, and example telemetry producers.
+SignalPlane now has a Silver self-hosted product baseline in this repository: a runnable Go service, embedded dashboard, HTTP JSON and OTLP HTTP JSON/protobuf telemetry ingestion, a node-local log-agent collector profile, login sessions, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival and query APIs, alert rules, notification channels, replay handling, Helm deployment assets, and example telemetry producers.
 
 The current implementation is suitable for local demos, on-prem pilots, and production-design validation. Larger production rollouts should still add normalized PostgreSQL repositories, richer UI forms, native OTLP gRPC ingestion, and release/upgrade automation.
 
@@ -104,11 +104,12 @@ Start here:
 - Incident records.
 - Uptime monitor definitions and local uptime checks.
 - Demo checkout application that continuously emits logs, metrics, traces, host telemetry, and uptime registration.
+- Local log-agent demo that tails app log files, enriches records, batches and retries sends, and forwards logs through the OpenTelemetry gateway collector.
 - Example apps for Go, Node.js, Python, C, database/dependency, worker, and Kubernetes-style metadata.
 
 ## Run The Silver Demo
 
-Run the full local platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, Mailpit, and SignalPlane:
+Run the full local platform stack with PostgreSQL, ClickHouse, OpenTelemetry gateway collector, local log-agent collector, demo log writer, Mailpit, and SignalPlane:
 
 ```bash
 make stack-up

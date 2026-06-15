@@ -30,6 +30,25 @@
     </aside>
 
     <main>
+      <section id="login-panel" class="login-panel hidden">
+        <form id="login-form" class="login-form">
+          <div>
+            <p class="eyebrow">Session required</p>
+            <h2>Sign in to SignalPlane</h2>
+            <p id="login-error" class="login-error"></p>
+          </div>
+          <label>
+            Email
+            <input id="login-email" type="email" autocomplete="username" placeholder="admin@signalplane.local" required>
+          </label>
+          <label>
+            Password
+            <input id="login-password" type="password" autocomplete="current-password" placeholder="Password" required>
+          </label>
+          <button type="submit">Sign in</button>
+        </form>
+      </section>
+
       <header class="topbar">
         <div>
           <p class="eyebrow">Open observability control plane</p>

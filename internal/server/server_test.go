@@ -65,7 +65,9 @@ func TestIngestRequiresToken(t *testing.T) {
 }
 
 func TestStateChangingEndpointsRequireAdminToken(t *testing.T) {
-	app := New(Config{IngestToken: "test-token"}, store.New(), slog.Default())
+	data := store.New()
+	data.CreateToken(store.TokenInput{Name: "admin", Token: "admin-token", Scope: "admin"})
+	app := New(Config{IngestToken: "ingest-token"}, data, slog.Default())
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/incidents", bytes.NewReader([]byte(`{"title":"database degraded"}`)))
@@ -76,21 +78,59 @@ func TestStateChangingEndpointsRequireAdminToken(t *testing.T) {
 
 	resp = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "/api/incidents", bytes.NewReader([]byte(`{"title":"database degraded"}`)))
-	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Authorization", "Bearer ingest-token")
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected incident creation with ingest token to be unauthorized, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodPost, "/api/incidents", bytes.NewReader([]byte(`{"title":"database degraded"}`)))
+	req.Header.Set("Authorization", "Bearer admin-token")
 	app.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusCreated {
 		t.Fatalf("expected incident creation with admin token, got %d: %s", resp.Code, resp.Body.String())
 	}
 }
 
+func TestReadEndpointsCanRequireReadToken(t *testing.T) {
+	data := store.NewSeeded()
+	data.CreateToken(store.TokenInput{Name: "reader", Token: "read-token", Scope: "read"})
+	app := New(Config{IngestToken: "ingest-token", RequireReadAuth: true}, data, slog.Default())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/services", nil)
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected services to require read auth, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/services", nil)
+	req.Header.Set("Authorization", "Bearer ingest-token")
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected ingest token not to grant read access, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/services", nil)
+	req.Header.Set("Authorization", "Bearer read-token")
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected read token to grant services access, got %d: %s", resp.Code, resp.Body.String())
+	}
+}
+
 func TestManualUptimeCheck(t *testing.T) {
 	data := store.New()
+	data.CreateToken(store.TokenInput{Name: "admin", Token: "admin-token", Scope: "admin"})
 	data.CreateUptimeMonitor(store.UptimeMonitor{ID: "upt-test", Name: "test target", URL: "://bad-url", ExpectedStatus: http.StatusOK})
-	app := New(Config{IngestToken: "test-token"}, data, slog.Default())
+	app := New(Config{IngestToken: "ingest-token"}, data, slog.Default())
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/api/uptime-monitors/upt-test/check", nil)
-	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Authorization", "Bearer admin-token")
 	app.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected uptime check 200, got %d: %s", resp.Code, resp.Body.String())
@@ -157,6 +197,32 @@ func TestOTLPHTTPProtobufIngestion(t *testing.T) {
 	})
 	if logs := data.Logs(10, "proto-api", "error", "proto failure"); len(logs) != 1 {
 		t.Fatalf("expected one protobuf log, got %d", len(logs))
+	}
+
+	postProto(t, app, "/v1/logs", &logspb.LogsData{
+		ResourceLogs: []*logspb.ResourceLogs{{
+			Resource: &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
+				{Key: "service.name", Value: stringValue("agent-checkout-api")},
+			}},
+			ScopeLogs: []*logspb.ScopeLogs{{
+				LogRecords: []*logspb.LogRecord{{
+					TimeUnixNano:   now + 1,
+					SeverityNumber: logspb.SeverityNumber_SEVERITY_NUMBER_INFO,
+					Body:           stringValue("agent filelog record"),
+					Attributes: []*commonpb.KeyValue{
+						{Key: "traceId", Value: stringValue("00000000000000000000000000000001")},
+						{Key: "spanId", Value: stringValue("0000000000000001")},
+					},
+				}},
+			}},
+		}},
+	})
+	agentLogs := data.Logs(10, "agent-checkout-api", "info", "agent filelog")
+	if len(agentLogs) != 1 {
+		t.Fatalf("expected one agent log, got %d", len(agentLogs))
+	}
+	if agentLogs[0].TraceID != "00000000000000000000000000000001" || agentLogs[0].SpanID != "0000000000000001" {
+		t.Fatalf("expected agent trace/span promotion, got trace=%q span=%q", agentLogs[0].TraceID, agentLogs[0].SpanID)
 	}
 
 	postProto(t, app, "/v1/metrics", &metricspb.MetricsData{

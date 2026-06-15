@@ -22,6 +22,7 @@ Production installs should provide external HA PostgreSQL and ClickHouse. The ch
 kubectl create namespace signalplane
 kubectl -n signalplane create secret generic signalplane-runtime \
   --from-literal=ingest-token='<replace-me>' \
+  --from-literal=bootstrap-admin-token='<replace-me-or-empty>' \
   --from-literal=bootstrap-user-email='admin@customer.local' \
   --from-literal=bootstrap-user-password='<replace-me>' \
   --from-literal=postgres-url='postgres://signalplane:<password>@postgres.customer.local:5432/signalplane?sslmode=require' \
@@ -55,5 +56,7 @@ Update these for each customer:
 - `config.smtpAddr`
 - `config.notificationFrom`
 - `secret.existingSecret`
+
+Use a separate ingest token for collectors and an admin token or owner login for configuration. Leave `bootstrap-admin-token` empty when the customer does not want a long-lived bootstrap admin token.
 
 Use [../../../docs/ON_PREM_DEPLOYMENT.md](../../../docs/ON_PREM_DEPLOYMENT.md) for the full deployment runbook.

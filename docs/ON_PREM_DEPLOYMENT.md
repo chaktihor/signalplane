@@ -64,7 +64,8 @@ Default local credentials:
 ```text
 email: admin@signalplane.local
 password: admin-password
-token: dev-token
+ingest token: dev-token
+admin token: dev-admin-token
 ```
 
 The Podman stack starts:
@@ -90,6 +91,7 @@ Create the runtime secret:
 ```bash
 kubectl -n signalplane create secret generic signalplane-runtime \
   --from-literal=ingest-token='<replace-with-random-token>' \
+  --from-literal=bootstrap-admin-token='<replace-with-random-token-or-empty>' \
   --from-literal=bootstrap-user-email='admin@customer.local' \
   --from-literal=bootstrap-user-password='<replace-with-random-password>' \
   --from-literal=postgres-url='postgres://signalplane:<password>@postgres.customer.local:5432/signalplane?sslmode=require' \
@@ -142,7 +144,7 @@ Check health:
 
 ```bash
 curl http://127.0.0.1:4318/healthz
-curl http://127.0.0.1:4318/api/system/dependencies
+curl -H "Authorization: Bearer <admin-or-read-token>" http://127.0.0.1:4318/api/system/dependencies
 ```
 
 ## What Happens Under The Hood

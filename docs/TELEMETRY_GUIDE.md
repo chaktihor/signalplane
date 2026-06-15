@@ -6,7 +6,7 @@ This guide explains how to send telemetry to SignalPlane.
 
 Ingestion endpoints require a token.
 
-Default local bootstrap token:
+Default local ingest token:
 
 ```text
 dev-token
@@ -26,9 +26,12 @@ X-SignalPlane-Token: dev-token
 
 ## Create A Scoped Ingestion Token
 
+Token creation requires an admin token or login session. The local Podman stack
+bootstraps `dev-admin-token` for admin automation and `dev-token` for ingestion.
+
 ```bash
 curl -X POST http://127.0.0.1:4318/api/tokens \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "orders-api",
@@ -53,7 +56,23 @@ POST /v1/logs
 POST /v1/traces
 ```
 
-Production collectors should forward to SignalPlane with the OTLP HTTP exporter:
+Production deployments should prefer a collector topology:
+
+```text
+application stdout/file/SDK
+  -> node-local agent collector
+  -> gateway collector
+  -> SignalPlane ingest tier
+  -> ClickHouse telemetry store
+```
+
+Direct application calls to SignalPlane are useful for demos, tests, and simple
+integrations. High-volume production services should not synchronously push
+every log line to a single API endpoint. Local agents should collect close to
+the workload, enrich records with host/container/Kubernetes metadata, batch,
+compress, retry, buffer on local disk, and forward to a gateway collector.
+
+Gateway collectors should forward to SignalPlane with the OTLP HTTP exporter:
 
 ```yaml
 exporters:
@@ -64,6 +83,47 @@ exporters:
 ```
 
 Applications that emit OTLP gRPC should send to an OpenTelemetry Collector. The collector receives gRPC and forwards OTLP HTTP protobuf to SignalPlane.
+
+## Local Log Agent
+
+The Podman stack includes a local log-agent profile:
+
+- Config: `deploy/otel-collector/agent-config.yaml`
+- Demo app log writer: `examples/log-writer/write-logs.sh`
+- Shared log path inside the stack: `/var/log/signalplane-apps/*.log`
+
+The agent tails newline-delimited JSON logs, parses severity/timestamp/body,
+maps service and host fields into OpenTelemetry resource attributes, batches,
+retries, persists its send queue under `/var/lib/otelcol/storage`, compresses
+OTLP traffic, and forwards logs to the gateway collector.
+
+Expected JSON log shape:
+
+```json
+{
+  "timestamp": "2026-06-15T14:30:00Z",
+  "severity": "info",
+  "message": "checkout completed",
+  "traceId": "00000000000000000000000000000001",
+  "spanId": "0000000000000001",
+  "service": "agent-checkout-api",
+  "host": "demo-node-1",
+  "environment": "production",
+  "region": "local",
+  "version": "agent-demo-0.1.0",
+  "orderId": "ord-agent-000001"
+}
+```
+
+Verify agent-collected logs:
+
+```bash
+curl 'http://127.0.0.1:4318/api/logs?service=agent-checkout-api&limit=5'
+```
+
+In Kubernetes or OpenShift, run the agent profile as a DaemonSet and collect
+container stdout logs from `/var/log/pods` or the customer-approved container
+runtime log path.
 
 ## Resource Metadata
 
@@ -174,7 +234,7 @@ Metric fields:
 
 ## Logs
 
-Endpoint:
+Direct API endpoint:
 
 ```text
 POST /api/ingest/logs

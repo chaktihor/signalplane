@@ -47,6 +47,11 @@ spec:
                 secretKeyRef:
                   name: {{ include "signalplane.secretName" . }}
                   key: {{ .Values.secret.keys.ingestToken }}
+            - name: SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "signalplane.secretName" . }}
+                  key: {{ .Values.secret.keys.bootstrapAdminToken }}
             - name: SIGNALPLANE_BOOTSTRAP_USER_EMAIL
               valueFrom:
                 secretKeyRef:

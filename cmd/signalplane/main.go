@@ -27,7 +27,7 @@ func main() {
 	notificationDispatcher := notificationDispatcherFromEnv(logger)
 	cfg := server.Config{
 		Addr:               envString("SIGNALPLANE_ADDR", "127.0.0.1:4318"),
-		IngestToken:        envString("SIGNALPLANE_INGEST_TOKEN", "dev-token"),
+		IngestToken:        envString("SIGNALPLANE_INGEST_TOKEN", ""),
 		ReadTimeout:        envDurationSeconds("SIGNALPLANE_READ_TIMEOUT_SECONDS", 5),
 		WriteTimeout:       envDurationSeconds("SIGNALPLANE_WRITE_TIMEOUT_SECONDS", 10),
 		IdleTimeout:        envDurationSeconds("SIGNALPLANE_IDLE_TIMEOUT_SECONDS", 60),
@@ -36,13 +36,14 @@ func main() {
 		NotificationTester: notificationDispatcher,
 		SecureCookies:      envBool("SIGNALPLANE_SECURE_COOKIES", false),
 		CookieDomain:       envString("SIGNALPLANE_COOKIE_DOMAIN", ""),
+		RequireReadAuth:    envBool("SIGNALPLANE_REQUIRE_READ_AUTH", true),
 	}
 
 	data, err := store.Open(store.Options{
 		Path:                  envString("SIGNALPLANE_DATA_PATH", "data/signalplane.json"),
 		Backend:               envString("SIGNALPLANE_STORE_BACKEND", "json"),
 		Seed:                  envBool("SIGNALPLANE_SEED_DEMO_DATA", true),
-		BootstrapToken:        cfg.IngestToken,
+		BootstrapToken:        envString("SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN", ""),
 		BootstrapUserEmail:    envString("SIGNALPLANE_BOOTSTRAP_USER_EMAIL", ""),
 		BootstrapUserPassword: envString("SIGNALPLANE_BOOTSTRAP_USER_PASSWORD", ""),
 		TelemetrySink:         telemetrySink,
@@ -55,6 +56,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer data.Close()
+	if data.RevokeAdminTokenValue(cfg.IngestToken) {
+		logger.Warn("revoked admin token that matched configured ingest token")
+	}
 
 	app := server.New(cfg, data, logger)
 	httpServer := app.HTTPServer()
@@ -67,7 +71,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("signalplane listening", "addr", cfg.Addr, "ingest_token", cfg.IngestToken)
+		logger.Info("signalplane listening", "addr", cfg.Addr, "ingest_configured", cfg.IngestToken != "", "read_auth_required", cfg.RequireReadAuth)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "error", err)
 			os.Exit(1)

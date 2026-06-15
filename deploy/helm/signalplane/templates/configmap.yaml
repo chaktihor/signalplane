@@ -32,3 +32,4 @@ data:
   SIGNALPLANE_MAILPIT_URL: {{ .Values.config.mailpitURL | quote }}
   SIGNALPLANE_SECURE_COOKIES: {{ .Values.config.secureCookies | quote }}
   SIGNALPLANE_COOKIE_DOMAIN: {{ .Values.config.cookieDomain | quote }}
+  SIGNALPLANE_REQUIRE_READ_AUTH: {{ .Values.config.requireReadAuth | quote }}

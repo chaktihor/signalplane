@@ -9,6 +9,7 @@ Silver is a self-hosted observability product for small teams and early adopters
 - SignalPlane API and web dashboard.
 - JSON telemetry ingestion for metrics, logs, traces, hosts, and uptime.
 - OTLP HTTP JSON and protobuf ingestion at `/v1/metrics`, `/v1/logs`, and `/v1/traces`.
+- Node-local log-agent collector profile for file/stdout-style application logs.
 - PostgreSQL-backed runtime persistence in the Podman stack.
 - ClickHouse telemetry archival and ClickHouse-backed telemetry query APIs.
 - Durable telemetry replay queue for failed ClickHouse writes.
@@ -92,14 +93,15 @@ Default local admin:
 ```text
 email: admin@signalplane.local
 password: admin-password
-token: dev-token
+admin token: dev-admin-token
+ingest token: dev-token
 ```
 
 Check health:
 
 ```bash
 curl http://127.0.0.1:4318/healthz
-curl http://127.0.0.1:4318/api/system/dependencies
+curl -H "Authorization: Bearer dev-admin-token" http://127.0.0.1:4318/api/system/dependencies
 ```
 
 Stop:
@@ -116,23 +118,29 @@ make stack-reset
 
 ## What Happens Under The Hood
 
-1. Applications send telemetry to SignalPlane JSON endpoints or OTLP HTTP JSON/protobuf endpoints.
-2. SignalPlane authenticates the request with an API token.
-3. SignalPlane normalizes resource metadata such as service, host, environment, region, and version.
-4. SignalPlane infers services and hosts.
-5. SignalPlane updates the runtime model.
-6. Runtime state is persisted to PostgreSQL when `SIGNALPLANE_STORE_BACKEND=postgres`.
-7. Telemetry is written to ClickHouse when `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`.
-8. If ClickHouse is temporarily unavailable, failed telemetry writes are appended to `SIGNALPLANE_TELEMETRY_REPLAY_PATH`.
-9. A background replay loop retries spooled telemetry every 10 seconds.
-10. Query APIs read telemetry from ClickHouse when configured and fall back to runtime state if ClickHouse queries fail.
-11. Built-in alert logic and configured alert rules evaluate incoming telemetry.
-12. Alerts are persisted and sent to enabled notification channels.
+1. Applications write logs to stdout/files or emit OTLP through SDKs.
+2. A node-local collector agent tails local logs or receives SDK telemetry close to the workload.
+3. The agent enriches telemetry with service, host, environment, region, version, and platform metadata.
+4. The agent batches, compresses, retries, and buffers failed sends on local disk.
+5. Gateway collectors receive OTLP from agents and SDKs.
+6. Gateway collectors forward OTLP HTTP protobuf to SignalPlane with an ingest token.
+7. Direct SignalPlane JSON endpoints remain available for demos, tests, and simple integrations.
+8. SignalPlane authenticates the request with an API token.
+9. SignalPlane normalizes resource metadata and infers services and hosts.
+10. SignalPlane updates the runtime model.
+11. Runtime state is persisted to PostgreSQL when `SIGNALPLANE_STORE_BACKEND=postgres`.
+12. Telemetry is written to ClickHouse when `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`.
+13. If ClickHouse is temporarily unavailable, failed telemetry writes are appended to `SIGNALPLANE_TELEMETRY_REPLAY_PATH`.
+14. A background replay loop retries spooled telemetry every 10 seconds.
+15. Query APIs read telemetry from ClickHouse when configured and fall back to runtime state if ClickHouse queries fail.
+16. Built-in alert logic and configured alert rules evaluate incoming telemetry.
+17. Alerts are persisted and sent to enabled notification channels.
 
 ## How Logs Are Captured
 
 Logs can enter SignalPlane through:
 
+- A node-local log-agent collector tailing stdout/file/container logs and forwarding OTLP to the gateway collector.
 - `POST /api/ingest/logs`
 - `POST /v1/logs` for OTLP HTTP JSON or protobuf
 

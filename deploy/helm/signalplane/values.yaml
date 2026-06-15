@@ -98,24 +98,27 @@ config:
   mailpitURL: ""
   secureCookies: "false"
   cookieDomain: ""
+  requireReadAuth: "true"
 
 secret:
   create: true
   existingSecret: ""
   keys:
     ingestToken: ingest-token
+    bootstrapAdminToken: bootstrap-admin-token
     bootstrapUserEmail: bootstrap-user-email
     bootstrapUserPassword: bootstrap-user-password
     postgresURL: postgres-url
     postgresPassword: postgres-password
     clickhousePassword: clickhouse-password
   values:
-    ingestToken: change-me
+    ingestToken: ""
+    bootstrapAdminToken: ""
     bootstrapUserEmail: admin@signalplane.local
-    bootstrapUserPassword: change-me
-    postgresURL: postgres://signalplane:change-me@postgres.signalplane.svc.cluster.local:5432/signalplane?sslmode=require
-    postgresPassword: change-me
-    clickhousePassword: change-me
+    bootstrapUserPassword: ""
+    postgresURL: ""
+    postgresPassword: ""
+    clickhousePassword: ""
 
 extraEnv: []
 extraVolumes: []

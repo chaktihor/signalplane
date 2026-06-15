@@ -151,8 +151,15 @@ func TestMetricAlertRuleCreatesAlert(t *testing.T) {
 	if len(alerts) == 0 {
 		t.Fatal("expected alert rule to create an alert")
 	}
-	if alerts[0].Source != "alert-rule" {
-		t.Fatalf("expected alert-rule source, got %q", alerts[0].Source)
+	found := false
+	for _, alert := range alerts {
+		if alert.Source == "alert-rule" && alert.Labels["signal"] == "metric" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected alert-rule source, got %#v", alerts)
 	}
 }
 
@@ -173,5 +180,24 @@ func TestAuthenticateCreatesSessionWithRoleScopes(t *testing.T) {
 	}
 	if !s.ValidSession(session.Token, "admin") {
 		t.Fatal("expected owner session to allow admin scope")
+	}
+}
+
+func TestRevokeAdminTokenValueOnlyRevokesMatchingAdminTokens(t *testing.T) {
+	s := New()
+	s.CreateToken(TokenInput{Name: "legacy-admin", Token: "shared-token", Scope: "admin"})
+	s.CreateToken(TokenInput{Name: "collector", Token: "shared-token", Scope: "ingest"})
+
+	if !s.ValidToken("shared-token", "admin") {
+		t.Fatal("expected shared token to initially allow admin")
+	}
+	if !s.RevokeAdminTokenValue("shared-token") {
+		t.Fatal("expected matching admin token to be revoked")
+	}
+	if s.ValidToken("shared-token", "admin") {
+		t.Fatal("expected shared token not to allow admin after revocation")
+	}
+	if !s.ValidToken("shared-token", "ingest") {
+		t.Fatal("expected matching ingest token to remain valid")
 	}
 }

@@ -91,13 +91,14 @@ func parseOTLPLogs(payload map[string]any) []store.LogInput {
 		resource := otlpResource(object(resourceLog["resource"]))
 		for _, scopeLog := range objectList(resourceLog["scopeLogs"]) {
 			for _, record := range objectList(scopeLog["logRecords"]) {
+				fields := otlpAttributes(record["attributes"])
 				out = append(out, store.LogInput{
 					Timestamp: otlpUnixNano(record["timeUnixNano"]),
 					Severity:  firstNonEmptyString(textField(record["severityText"]), strings.ToLower(textField(record["severityNumber"]))),
 					Message:   otlpValue(record["body"]),
-					TraceID:   hexField(record["traceId"]),
-					SpanID:    hexField(record["spanId"]),
-					Fields:    otlpAttributes(record["attributes"]),
+					TraceID:   firstNonEmptyString(hexField(record["traceId"]), fields["traceId"], fields["trace_id"]),
+					SpanID:    firstNonEmptyString(hexField(record["spanId"]), fields["spanId"], fields["span_id"]),
+					Fields:    fields,
 					Resource:  resource,
 				})
 			}
@@ -112,13 +113,14 @@ func parseOTLPLogsProto(payload *logspb.LogsData) []store.LogInput {
 		resource := otlpResourceProto(resourceLog.GetResource().GetAttributes())
 		for _, scopeLog := range resourceLog.GetScopeLogs() {
 			for _, record := range scopeLog.GetLogRecords() {
+				fields := otlpAttributesProto(record.GetAttributes())
 				out = append(out, store.LogInput{
 					Timestamp: otlpUnixNanoUint(firstNonZeroUint64(record.GetTimeUnixNano(), record.GetObservedTimeUnixNano())),
 					Severity:  otlpLogSeverity(record),
 					Message:   otlpValueProto(record.GetBody()),
-					TraceID:   bytesHex(record.GetTraceId()),
-					SpanID:    bytesHex(record.GetSpanId()),
-					Fields:    otlpAttributesProto(record.GetAttributes()),
+					TraceID:   firstNonEmptyString(bytesHex(record.GetTraceId()), fields["traceId"], fields["trace_id"]),
+					SpanID:    firstNonEmptyString(bytesHex(record.GetSpanId()), fields["spanId"], fields["span_id"]),
+					Fields:    fields,
 					Resource:  resource,
 				})
 			}

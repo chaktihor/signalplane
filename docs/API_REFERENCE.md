@@ -8,7 +8,7 @@ http://127.0.0.1:4318
 
 ## Authentication
 
-Ingestion, token-management, user-management, alert-rule, notification-channel, and state-changing configuration endpoints require either an API token or a login session.
+Read APIs, ingestion, token-management, user-management, alert-rule, notification-channel, and state-changing configuration endpoints require either a scoped API token or a login session when `SIGNALPLANE_REQUIRE_READ_AUTH=true`.
 
 Use:
 
@@ -22,10 +22,16 @@ or:
 X-SignalPlane-Token: <token>
 ```
 
-Default local bootstrap/admin token:
+Default local ingest token:
 
 ```text
 dev-token
+```
+
+Default local bootstrap admin token in the Podman stack:
+
+```text
+dev-admin-token
 ```
 
 Default local stack owner:
@@ -68,6 +74,8 @@ curl http://127.0.0.1:4318/healthz
 
 Returns summary counts, health, recent alerts, top services, and top hosts.
 
+Requires a read/admin token or login session when read auth is enabled.
+
 ```bash
 curl http://127.0.0.1:4318/api/bootstrap
 ```
@@ -85,7 +93,8 @@ Query parameters:
 | `limit` | Max results, default `100`, max `500` |
 
 ```bash
-curl 'http://127.0.0.1:4318/api/services?limit=50'
+curl 'http://127.0.0.1:4318/api/services?limit=50' \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ## Hosts
@@ -95,7 +104,8 @@ curl 'http://127.0.0.1:4318/api/services?limit=50'
 Returns inferred hosts.
 
 ```bash
-curl 'http://127.0.0.1:4318/api/hosts?limit=50'
+curl 'http://127.0.0.1:4318/api/hosts?limit=50' \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ## Metrics
@@ -105,7 +115,8 @@ curl 'http://127.0.0.1:4318/api/hosts?limit=50'
 Returns recent metric samples. When ClickHouse is configured, results come from ClickHouse with runtime fallback.
 
 ```bash
-curl 'http://127.0.0.1:4318/api/metrics?limit=50'
+curl 'http://127.0.0.1:4318/api/metrics?limit=50' \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/ingest/metrics`
@@ -137,7 +148,8 @@ Query parameters:
 | `q` | Search message text |
 
 ```bash
-curl 'http://127.0.0.1:4318/api/logs?service=orders-api&severity=error'
+curl 'http://127.0.0.1:4318/api/logs?service=orders-api&severity=error' \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/ingest/logs`
@@ -168,7 +180,8 @@ Query parameters:
 | `status` | Filter by `ok` or `error` |
 
 ```bash
-curl 'http://127.0.0.1:4318/api/traces?service=orders-api'
+curl 'http://127.0.0.1:4318/api/traces?service=orders-api' \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/ingest/traces`
@@ -221,7 +234,7 @@ Statuses:
 
 ```bash
 curl -X PATCH http://127.0.0.1:4318/api/alerts/ALERT_ID \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"status":"acknowledged"}'
 ```
@@ -233,7 +246,8 @@ curl -X PATCH http://127.0.0.1:4318/api/alerts/ALERT_ID \
 Returns incidents.
 
 ```bash
-curl http://127.0.0.1:4318/api/incidents
+curl http://127.0.0.1:4318/api/incidents \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/incidents`
@@ -244,7 +258,7 @@ Creates an incident.
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/incidents \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"title":"Checkout degradation","severity":"warning","owner":"platform"}'
 ```
@@ -256,7 +270,8 @@ curl -X POST http://127.0.0.1:4318/api/incidents \
 Returns uptime monitor definitions and latest check results.
 
 ```bash
-curl http://127.0.0.1:4318/api/uptime-monitors
+curl http://127.0.0.1:4318/api/uptime-monitors \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/uptime-monitors`
@@ -267,7 +282,7 @@ Creates an uptime monitor definition. SignalPlane checks due monitors in the bac
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/uptime-monitors \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"name":"API health","url":"http://localhost:8080/healthz","expectedStatus":200}'
 ```
@@ -280,7 +295,7 @@ Runs an immediate uptime check and stores the latest result.
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/uptime-monitors/upt-demo-shop/check \
-  -H "Authorization: Bearer dev-token"
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ## System Dependencies
@@ -290,7 +305,8 @@ curl -X POST http://127.0.0.1:4318/api/uptime-monitors/upt-demo-shop/check \
 Returns health checks for configured local platform dependencies such as PostgreSQL, ClickHouse, OpenTelemetry Collector, SMTP, and Mailpit.
 
 ```bash
-curl http://127.0.0.1:4318/api/system/dependencies
+curl http://127.0.0.1:4318/api/system/dependencies \
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ## Tokens
@@ -303,7 +319,7 @@ Returns tokens with masked token values.
 
 ```bash
 curl http://127.0.0.1:4318/api/tokens \
-  -H "Authorization: Bearer dev-token"
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/tokens`
@@ -320,7 +336,7 @@ Scopes:
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/tokens \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"name":"orders-api","scope":"ingest","token":"orders-dev-token"}'
 ```
@@ -335,7 +351,7 @@ Returns local users without password hashes.
 
 ```bash
 curl http://127.0.0.1:4318/api/users \
-  -H "Authorization: Bearer dev-token"
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/users`
@@ -346,7 +362,7 @@ Creates a local user.
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/users \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"email":"viewer@example.com","displayName":"Viewer","role":"viewer","password":"change-me"}'
 ```
@@ -359,7 +375,7 @@ Requires admin access.
 
 ```bash
 curl http://127.0.0.1:4318/api/alert-rules \
-  -H "Authorization: Bearer dev-token"
+  -H "Authorization: Bearer dev-admin-token"
 ```
 
 ### `POST /api/alert-rules`
@@ -370,7 +386,7 @@ Creates a metric or log alert rule.
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/alert-rules \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"name":"High latency","signalType":"metric","metricName":"http.server.duration","operator":"gte","threshold":500,"severity":"warning"}'
 ```
@@ -389,7 +405,7 @@ Creates an email, webhook, or Slack-compatible webhook channel.
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/notification-channels \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"name":"Local email","type":"email","target":"oncall@signalplane.local"}'
 ```

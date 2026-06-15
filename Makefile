@@ -1,4 +1,4 @@
-.PHONY: run test build stack-up stack-down stack-logs stack-reset demo-shop demo-traffic fmt clean
+.PHONY: run test build stack-up stack-down stack-logs stack-agent-logs stack-reset demo-shop demo-traffic fmt clean
 
 APP := signalplane
 BIN := bin/$(APP)
@@ -22,6 +22,9 @@ stack-down:
 
 stack-logs:
 	$(CONTAINER_COMPOSE) logs -f
+
+stack-agent-logs:
+	$(CONTAINER_COMPOSE) logs -f demo-log-writer signalplane-log-agent
 
 stack-reset:
 	$(CONTAINER_COMPOSE) down -v

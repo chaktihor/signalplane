@@ -446,9 +446,6 @@ func New() *Store {
 }
 
 func Open(options Options) (*Store, error) {
-	if options.BootstrapToken == "" {
-		options.BootstrapToken = "dev-token"
-	}
 	persistence, err := stateStoreFromOptions(options)
 	if err != nil {
 		return nil, err
@@ -897,6 +894,29 @@ func (s *Store) CreateToken(input TokenInput) APIToken {
 	s.auditLocked("token.created", "token", token.ID, map[string]string{"scope": token.Scope})
 	_ = s.saveLocked()
 	return token
+}
+
+func (s *Store) RevokeAdminTokenValue(token string) bool {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	changed := false
+	for id, candidate := range s.tokens {
+		if candidate.Token != token || candidate.Scope != "admin" || candidate.RevokedAt != "" {
+			continue
+		}
+		candidate.RevokedAt = now()
+		s.tokens[id] = candidate
+		changed = true
+		s.auditLocked("token.revoked", "token", candidate.ID, map[string]string{"reason": "admin-token-matched-ingest-token"})
+	}
+	if changed {
+		_ = s.saveLocked()
+	}
+	return changed
 }
 
 func (s *Store) AlertRules(max int) []AlertRule {

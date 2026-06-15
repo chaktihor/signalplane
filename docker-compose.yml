@@ -47,6 +47,38 @@ services:
     volumes:
       - ./deploy/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
 
+  signalplane-log-agent:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otelcol-contrib/agent-config.yaml"]
+    depends_on:
+      otel-collector:
+        condition: service_started
+    volumes:
+      - ./deploy/otel-collector/agent-config.yaml:/etc/otelcol-contrib/agent-config.yaml:ro
+      - app-logs:/var/log/signalplane-apps:ro
+      - otel-agent-storage:/var/lib/otelcol/storage
+
+  demo-log-writer:
+    image: signalplane:dev
+    entrypoint: ["/bin/sh"]
+    command: ["/opt/signalplane/write-logs.sh"]
+    depends_on:
+      signalplane:
+        condition: service_started
+      signalplane-log-agent:
+        condition: service_started
+    environment:
+      SIGNALPLANE_SERVICE_NAME: agent-checkout-api
+      SIGNALPLANE_HOST_NAME: demo-node-1
+      SIGNALPLANE_ENVIRONMENT: production
+      SIGNALPLANE_REGION: local
+      SIGNALPLANE_SERVICE_VERSION: agent-demo-0.1.0
+      SIGNALPLANE_LOG_INTERVAL_SECONDS: "2"
+      SIGNALPLANE_LOG_FAIL_EVERY: "5"
+    volumes:
+      - ./examples/log-writer/write-logs.sh:/opt/signalplane/write-logs.sh:ro
+      - app-logs:/var/log/signalplane-apps
+
   mailpit:
     image: axllent/mailpit:v1.21
     ports:
@@ -63,8 +95,10 @@ services:
     environment:
       SIGNALPLANE_ADDR: "0.0.0.0:4318"
       SIGNALPLANE_INGEST_TOKEN: "dev-token"
+      SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN: "dev-admin-token"
       SIGNALPLANE_BOOTSTRAP_USER_EMAIL: "admin@signalplane.local"
       SIGNALPLANE_BOOTSTRAP_USER_PASSWORD: "admin-password"
+      SIGNALPLANE_REQUIRE_READ_AUTH: "true"
       SIGNALPLANE_DATA_PATH: "/data/signalplane.json"
       SIGNALPLANE_SEED_DEMO_DATA: "true"
       SIGNALPLANE_STORE_BACKEND: "postgres"
@@ -101,3 +135,5 @@ volumes:
   postgres-data:
   clickhouse-data:
   signalplane-data:
+  app-logs:
+  otel-agent-storage:

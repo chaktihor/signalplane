@@ -1,9 +1,41 @@
 const $ = (selector) => document.querySelector(selector);
 
 async function getJSON(path) {
-  const response = await fetch(path);
+  const response = await fetch(path, { credentials: "same-origin" });
+  if (response.status === 401) {
+    showLogin();
+    throw new Error("Login required");
+  }
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return response.json();
+}
+
+function showLogin(message = "") {
+  $("#login-panel").classList.remove("hidden");
+  $("#login-error").textContent = message;
+}
+
+function hideLogin() {
+  $("#login-panel").classList.add("hidden");
+  $("#login-error").textContent = "";
+}
+
+async function login(event) {
+  event.preventDefault();
+  const email = $("#login-email").value.trim();
+  const password = $("#login-password").value;
+  const response = await fetch("/api/auth/login", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password })
+  });
+  if (!response.ok) {
+    showLogin("Invalid email or password");
+    return;
+  }
+  hideLogin();
+  await refresh();
 }
 
 function text(value) {
@@ -180,6 +212,9 @@ async function refresh() {
 }
 
 $("#refresh").addEventListener("click", refresh);
+$("#login-form").addEventListener("submit", (event) => {
+  login(event).catch((error) => showLogin(error.message));
+});
 refresh().catch((error) => {
   $("#health-pill").textContent = error.message;
 });

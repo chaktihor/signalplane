@@ -29,6 +29,7 @@ type Config struct {
 	NotificationTester NotificationTester
 	SecureCookies      bool
 	CookieDomain       string
+	RequireReadAuth    bool
 }
 
 type TelemetryReader interface {
@@ -51,9 +52,6 @@ type Server struct {
 func New(cfg Config, data *store.Store, logger *slog.Logger) *Server {
 	if cfg.Addr == "" {
 		cfg.Addr = "127.0.0.1:4318"
-	}
-	if cfg.IngestToken == "" {
-		cfg.IngestToken = "dev-token"
 	}
 	if cfg.ReadTimeout == 0 {
 		cfg.ReadTimeout = 5 * time.Second
@@ -171,15 +169,27 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	writeJSON(w, http.StatusOK, s.store.Summary())
 }
 func (s *Server) services(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"services": s.store.Services(limitParam(r))})
 }
 func (s *Server) hosts(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"hosts": s.store.Hosts(limitParam(r))})
 }
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	if s.cfg.TelemetryReader != nil {
 		metrics, err := s.cfg.TelemetryReader.Metrics(r.Context(), limitParam(r))
 		if err == nil {
@@ -191,6 +201,9 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"metrics": s.store.Metrics(limitParam(r))})
 }
 func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	q := r.URL.Query()
 	if s.cfg.TelemetryReader != nil {
 		logs, err := s.cfg.TelemetryReader.Logs(r.Context(), limitParam(r), q.Get("service"), q.Get("severity"), q.Get("q"))
@@ -203,6 +216,9 @@ func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"logs": s.store.Logs(limitParam(r), q.Get("service"), q.Get("severity"), q.Get("q"))})
 }
 func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	q := r.URL.Query()
 	if s.cfg.TelemetryReader != nil {
 		traces, err := s.cfg.TelemetryReader.Traces(r.Context(), limitParam(r), q.Get("service"), q.Get("status"))
@@ -215,9 +231,15 @@ func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"traces": s.store.Traces(limitParam(r), q.Get("service"), q.Get("status"))})
 }
 func (s *Server) alerts(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"alerts": s.store.Alerts(limitParam(r))})
 }
 func (s *Server) incidents(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"incidents": s.store.Incidents(limitParam(r))})
 }
 func (s *Server) alertRules(w http.ResponseWriter, r *http.Request) {
@@ -227,6 +249,9 @@ func (s *Server) alertRules(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"alertRules": s.store.AlertRules(limitParam(r))})
 }
 func (s *Server) uptimeMonitors(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"uptimeMonitors": s.store.UptimeMonitors(limitParam(r))})
 }
 func (s *Server) notificationChannels(w http.ResponseWriter, r *http.Request) {
@@ -236,6 +261,9 @@ func (s *Server) notificationChannels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"notificationChannels": s.store.NotificationChannels(limitParam(r))})
 }
 func (s *Server) dependencies(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 	defer cancel()
 	writeJSON(w, http.StatusOK, map[string]any{"dependencies": platform.CheckAll(ctx, s.cfg.Dependencies)})
@@ -404,6 +432,9 @@ func (s *Server) ingestTraces(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedRead(w, r) {
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"openapi": "3.1.0",
 		"info":    map[string]string{"title": "SignalPlane Silver API", "version": "0.1.0"},
@@ -415,13 +446,20 @@ func (s *Server) authorized(w http.ResponseWriter, r *http.Request) bool {
 	return s.authorizedScope(w, r, "ingest")
 }
 
+func (s *Server) authorizedRead(w http.ResponseWriter, r *http.Request) bool {
+	if !s.cfg.RequireReadAuth {
+		return true
+	}
+	return s.authorizedScope(w, r, "read")
+}
+
 func (s *Server) authorizedScope(w http.ResponseWriter, r *http.Request, scope string) bool {
 	auth := strings.TrimSpace(r.Header.Get("Authorization"))
 	token := strings.TrimSpace(r.Header.Get("X-SignalPlane-Token"))
 	if strings.HasPrefix(auth, "Bearer ") {
 		token = strings.TrimPrefix(auth, "Bearer ")
 	}
-	if s.store.ValidToken(token, scope) || token == s.cfg.IngestToken {
+	if s.store.ValidToken(token, scope) || (scope == "ingest" && token != "" && token == s.cfg.IngestToken) {
 		return true
 	}
 	if s.store.ValidSession(sessionToken(r), scope) {

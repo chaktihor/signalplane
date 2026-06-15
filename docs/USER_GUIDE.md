@@ -19,6 +19,11 @@ The dashboard has these areas:
 - **Traces**: Recent traces and spans.
 - **Alerts**: Open alerts created from error telemetry.
 
+The local Podman stack uses separate tokens:
+
+- Ingest token for collectors and applications: `dev-token`
+- Admin/read token for API queries and configuration: `dev-admin-token`
+
 ## First Things To Check
 
 1. Confirm the health pill says `HEALTHY`.
@@ -90,7 +95,7 @@ Services are inferred from telemetry. A service appears when telemetry includes:
 API:
 
 ```bash
-curl http://127.0.0.1:4318/api/services
+curl -H "Authorization: Bearer dev-admin-token" http://127.0.0.1:4318/api/services
 ```
 
 ## View Hosts
@@ -108,7 +113,7 @@ Hosts are inferred from telemetry. A host appears when telemetry includes:
 API:
 
 ```bash
-curl http://127.0.0.1:4318/api/hosts
+curl -H "Authorization: Bearer dev-admin-token" http://127.0.0.1:4318/api/hosts
 ```
 
 ## View Logs
@@ -116,25 +121,25 @@ curl http://127.0.0.1:4318/api/hosts
 List recent logs:
 
 ```bash
-curl http://127.0.0.1:4318/api/logs
+curl -H "Authorization: Bearer dev-admin-token" http://127.0.0.1:4318/api/logs
 ```
 
 Filter by service:
 
 ```bash
-curl 'http://127.0.0.1:4318/api/logs?service=orders-api'
+curl -H "Authorization: Bearer dev-admin-token" 'http://127.0.0.1:4318/api/logs?service=orders-api'
 ```
 
 Filter by severity:
 
 ```bash
-curl 'http://127.0.0.1:4318/api/logs?severity=error'
+curl -H "Authorization: Bearer dev-admin-token" 'http://127.0.0.1:4318/api/logs?severity=error'
 ```
 
 Search message text:
 
 ```bash
-curl 'http://127.0.0.1:4318/api/logs?q=timeout'
+curl -H "Authorization: Bearer dev-admin-token" 'http://127.0.0.1:4318/api/logs?q=timeout'
 ```
 
 ## View Traces
@@ -142,32 +147,32 @@ curl 'http://127.0.0.1:4318/api/logs?q=timeout'
 List recent traces:
 
 ```bash
-curl http://127.0.0.1:4318/api/traces
+curl -H "Authorization: Bearer dev-admin-token" http://127.0.0.1:4318/api/traces
 ```
 
 Filter by service:
 
 ```bash
-curl 'http://127.0.0.1:4318/api/traces?service=orders-api'
+curl -H "Authorization: Bearer dev-admin-token" 'http://127.0.0.1:4318/api/traces?service=orders-api'
 ```
 
 Filter by status:
 
 ```bash
-curl 'http://127.0.0.1:4318/api/traces?status=error'
+curl -H "Authorization: Bearer dev-admin-token" 'http://127.0.0.1:4318/api/traces?status=error'
 ```
 
 ## View Alerts
 
 ```bash
-curl http://127.0.0.1:4318/api/alerts
+curl -H "Authorization: Bearer dev-admin-token" http://127.0.0.1:4318/api/alerts
 ```
 
 Acknowledge an alert:
 
 ```bash
 curl -X PATCH http://127.0.0.1:4318/api/alerts/ALERT_ID \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"status": "acknowledged"}'
 ```
@@ -176,7 +181,7 @@ Resolve an alert:
 
 ```bash
 curl -X PATCH http://127.0.0.1:4318/api/alerts/ALERT_ID \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{"status": "resolved"}'
 ```
@@ -185,7 +190,7 @@ curl -X PATCH http://127.0.0.1:4318/api/alerts/ALERT_ID \
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/incidents \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Checkout degradation",
@@ -199,7 +204,7 @@ curl -X POST http://127.0.0.1:4318/api/incidents \
 
 ```bash
 curl -X POST http://127.0.0.1:4318/api/uptime-monitors \
-  -H "Authorization: Bearer dev-token" \
+  -H "Authorization: Bearer dev-admin-token" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "Orders API health",

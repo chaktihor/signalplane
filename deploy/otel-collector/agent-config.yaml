@@ -1,0 +1,86 @@
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol/storage
+    create_directory: true
+
+receivers:
+  filelog/app:
+    include:
+      - /var/log/signalplane-apps/*.log
+    start_at: beginning
+    poll_interval: 1s
+    include_file_name: true
+    include_file_path: true
+    operators:
+      - type: json_parser
+        parse_from: body
+        timestamp:
+          parse_from: attributes.timestamp
+          layout_type: gotime
+          layout: "2006-01-02T15:04:05Z07:00"
+        severity:
+          parse_from: attributes.severity
+      - type: move
+        from: attributes.message
+        to: body
+      - type: move
+        from: attributes.service
+        to: resource["service.name"]
+      - type: move
+        from: attributes.host
+        to: resource["host.name"]
+      - type: move
+        from: attributes.environment
+        to: resource["deployment.environment"]
+      - type: move
+        from: attributes.region
+        to: resource["cloud.region"]
+      - type: move
+        from: attributes.version
+        to: resource["service.version"]
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+  resource/signalplane_agent:
+    attributes:
+      - key: signalplane.collector.role
+        value: node-log-agent
+        action: upsert
+      - key: signalplane.collector.pipeline
+        value: local-filelog
+        action: upsert
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 4096
+
+exporters:
+  otlphttp/gateway:
+    endpoint: http://otel-collector:4318
+    compression: gzip
+    timeout: 10s
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 10000
+      storage: file_storage
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 300s
+  debug:
+    verbosity: normal
+
+service:
+  extensions: [file_storage]
+  telemetry:
+    metrics:
+      address: 0.0.0.0:8889
+  pipelines:
+    logs:
+      receivers: [filelog/app]
+      processors: [memory_limiter, resource/signalplane_agent, batch]
+      exporters: [otlphttp/gateway, debug]
