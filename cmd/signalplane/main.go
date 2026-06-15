@@ -36,7 +36,7 @@ func main() {
 		NotificationTester: notificationDispatcher,
 		SecureCookies:      envBool("SIGNALPLANE_SECURE_COOKIES", false),
 		CookieDomain:       envString("SIGNALPLANE_COOKIE_DOMAIN", ""),
-		RequireReadAuth:    envBool("SIGNALPLANE_REQUIRE_READ_AUTH", true),
+		AllowPublicRead:    !envBool("SIGNALPLANE_REQUIRE_READ_AUTH", true),
 	}
 
 	data, err := store.Open(store.Options{
@@ -71,7 +71,7 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("signalplane listening", "addr", cfg.Addr, "ingest_configured", cfg.IngestToken != "", "read_auth_required", cfg.RequireReadAuth)
+		logger.Info("signalplane listening", "addr", cfg.Addr, "ingest_configured", cfg.IngestToken != "", "read_auth_required", !cfg.AllowPublicRead)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "error", err)
 			os.Exit(1)

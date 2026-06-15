@@ -29,7 +29,7 @@ type Config struct {
 	NotificationTester NotificationTester
 	SecureCookies      bool
 	CookieDomain       string
-	RequireReadAuth    bool
+	AllowPublicRead    bool
 }
 
 type TelemetryReader interface {
@@ -443,7 +443,7 @@ func (s *Server) authorized(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (s *Server) authorizedRead(w http.ResponseWriter, r *http.Request) bool {
-	if !s.cfg.RequireReadAuth {
+	if s.cfg.AllowPublicRead {
 		return true
 	}
 	return s.authorizedScope(w, r, "read")

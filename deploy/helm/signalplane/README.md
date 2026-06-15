@@ -59,4 +59,14 @@ Update these for each customer:
 
 Use a separate ingest token for collectors and an admin token or owner login for configuration. Leave `bootstrap-admin-token` empty when the customer does not want a long-lived bootstrap admin token.
 
+When `secret.create=true`, the chart intentionally fails rendering unless these values are set:
+
+- `secret.values.ingestToken`
+- `secret.values.postgresURL`
+- `secret.values.postgresPassword`
+- `secret.values.clickhousePassword`
+- Either `secret.values.bootstrapAdminToken`, or both `secret.values.bootstrapUserEmail` and `secret.values.bootstrapUserPassword` when `config.requireReadAuth=true`
+
+When `secret.create=false`, `secret.existingSecret` is required and must contain all keys listed in the install command above.
+
 Use [../../../docs/ON_PREM_DEPLOYMENT.md](../../../docs/ON_PREM_DEPLOYMENT.md) for the full deployment runbook.

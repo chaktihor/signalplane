@@ -20,7 +20,7 @@ import (
 )
 
 func TestHealthAndBootstrap(t *testing.T) {
-	app := New(Config{IngestToken: "test-token"}, store.NewSeeded(), slog.Default())
+	app := New(Config{IngestToken: "test-token", AllowPublicRead: true}, store.NewSeeded(), slog.Default())
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
@@ -96,7 +96,7 @@ func TestStateChangingEndpointsRequireAdminToken(t *testing.T) {
 func TestReadEndpointsCanRequireReadToken(t *testing.T) {
 	data := store.NewSeeded()
 	data.CreateToken(store.TokenInput{Name: "reader", Token: "read-token", Scope: "read"})
-	app := New(Config{IngestToken: "ingest-token", RequireReadAuth: true}, data, slog.Default())
+	app := New(Config{IngestToken: "ingest-token"}, data, slog.Default())
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/services", nil)
@@ -125,7 +125,7 @@ func TestReadEndpointsCanRequireReadToken(t *testing.T) {
 func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	data := store.New()
 	data.CreateToken(store.TokenInput{Name: "reader", Token: "read-token", Scope: "read"})
-	app := New(Config{RequireReadAuth: true}, data, slog.Default())
+	app := New(Config{}, data, slog.Default())
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/openapi", nil)
@@ -162,12 +162,52 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	if _, ok := ingestLogs["requestBody"].(map[string]any); !ok {
 		t.Fatal("expected ingest logs operation to declare a request body")
 	}
+	alertRuleList := paths["/api/alert-rules"].(map[string]any)["get"].(map[string]any)
+	if !operationHasScope(alertRuleList, "admin") {
+		t.Fatal("expected alert rule list operation to require admin scope")
+	}
+	notificationList := paths["/api/notification-channels"].(map[string]any)["get"].(map[string]any)
+	if !operationHasScope(notificationList, "admin") {
+		t.Fatal("expected notification channel list operation to require admin scope")
+	}
 	components := body["components"].(map[string]any)
 	schemas := components["schemas"].(map[string]any)
 	for _, schema := range []string{"LogInput", "Log", "MetricInput", "TraceInput", "Error"} {
 		if _, ok := schemas[schema]; !ok {
 			t.Fatalf("expected schema %s in openapi contract", schema)
 		}
+	}
+	spanProps := schemaProperties(t, schemas["SpanInput"])
+	if _, ok := spanProps["spanId"]; !ok {
+		t.Fatal("expected SpanInput to use spanId")
+	}
+	if _, ok := spanProps["id"]; ok {
+		t.Fatal("did not expect SpanInput to expose id; ingest uses spanId")
+	}
+	if _, ok := spanProps["service"]; ok {
+		t.Fatal("did not expect SpanInput to expose service; ingest uses resource")
+	}
+	alertRuleProps := schemaProperties(t, schemas["AlertRuleInput"])
+	if _, ok := alertRuleProps["signalType"]; !ok {
+		t.Fatal("expected AlertRuleInput to use signalType")
+	}
+	if _, ok := alertRuleProps["signal"]; ok {
+		t.Fatal("did not expect AlertRuleInput to expose stale signal field")
+	}
+	notificationProps := schemaProperties(t, schemas["NotificationChannelInput"])
+	if _, ok := notificationProps["type"]; !ok {
+		t.Fatal("expected NotificationChannelInput to use type")
+	}
+	if _, ok := notificationProps["kind"]; ok {
+		t.Fatal("did not expect NotificationChannelInput to expose stale kind field")
+	}
+	uptimeResponseProps := schemaProperties(t, schemas["UptimeMonitorResponse"])
+	if _, ok := uptimeResponseProps["uptimeMonitor"]; !ok {
+		t.Fatal("expected uptime response envelope to use uptimeMonitor")
+	}
+	notificationResponseProps := schemaProperties(t, schemas["NotificationChannelResponse"])
+	if _, ok := notificationResponseProps["notificationChannel"]; !ok {
+		t.Fatal("expected notification response envelope to use notificationChannel")
 	}
 	securitySchemes := components["securitySchemes"].(map[string]any)
 	if _, ok := securitySchemes["bearerAuth"]; !ok {
@@ -176,6 +216,44 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	if _, ok := securitySchemes["signalplaneToken"]; !ok {
 		t.Fatal("expected signalplaneToken security scheme")
 	}
+}
+
+func operationHasScope(operation map[string]any, scope string) bool {
+	security, ok := operation["security"].([]any)
+	if !ok {
+		return false
+	}
+	for _, item := range security {
+		scheme, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		for _, scopes := range scheme {
+			values, ok := scopes.([]any)
+			if !ok {
+				continue
+			}
+			for _, value := range values {
+				if value == scope {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func schemaProperties(t *testing.T, schema any) map[string]any {
+	t.Helper()
+	body, ok := schema.(map[string]any)
+	if !ok {
+		t.Fatalf("expected schema object, got %T", schema)
+	}
+	properties, ok := body["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected schema properties, got %T", body["properties"])
+	}
+	return properties
 }
 
 func TestManualUptimeCheck(t *testing.T) {
@@ -202,7 +280,7 @@ func TestManualUptimeCheck(t *testing.T) {
 }
 
 func TestDependencyEndpoint(t *testing.T) {
-	app := New(Config{Dependencies: []platform.DependencyCheck{{ID: "bad", Name: "Bad TCP", Kind: "tcp", Target: "127.0.0.1:1"}}}, store.New(), slog.Default())
+	app := New(Config{AllowPublicRead: true, Dependencies: []platform.DependencyCheck{{ID: "bad", Name: "Bad TCP", Kind: "tcp", Target: "127.0.0.1:1"}}}, store.New(), slog.Default())
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/system/dependencies", nil)

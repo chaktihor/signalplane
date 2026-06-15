@@ -43,6 +43,8 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "signalplane.secretName" -}}
 {{- if .Values.secret.existingSecret -}}
 {{- .Values.secret.existingSecret -}}
+{{- else if not .Values.secret.create -}}
+{{- fail "secret.existingSecret is required when secret.create=false" -}}
 {{- else -}}
 {{- printf "%s-secret" (include "signalplane.fullname" .) -}}
 {{- end -}}
