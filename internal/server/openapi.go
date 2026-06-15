@@ -40,9 +40,9 @@ func signalPlaneOpenAPI() map[string]any {
 			"/api/ingest/metrics":                  pathItem(postArrayOp("Ingest metrics", "Ingest SignalPlane JSON metrics.", "ingest", "MetricInput", refResponse("202", "MetricIngestResponse"), emptyResponse("401"))),
 			"/api/ingest/logs":                     pathItem(postArrayOp("Ingest logs", "Ingest SignalPlane JSON logs.", "ingest", "LogInput", refResponse("202", "LogIngestResponse"), emptyResponse("401"))),
 			"/api/ingest/traces":                   pathItem(postArrayOp("Ingest traces", "Ingest SignalPlane JSON traces.", "ingest", "TraceInput", refResponse("202", "TraceIngestResponse"), emptyResponse("401"))),
-			"/v1/metrics":                          pathItem(otlpOp("OTLP metrics", "Ingest OTLP HTTP JSON or protobuf metrics.")),
-			"/v1/logs":                             pathItem(otlpOp("OTLP logs", "Ingest OTLP HTTP JSON or protobuf logs.")),
-			"/v1/traces":                           pathItem(otlpOp("OTLP traces", "Ingest OTLP HTTP JSON or protobuf traces.")),
+			"/v1/metrics":                          pathItem(otlpOp("OTLP metrics", "Ingest OTLP HTTP JSON or protobuf metrics.", "MetricIngestResponse")),
+			"/v1/logs":                             pathItem(otlpOp("OTLP logs", "Ingest OTLP HTTP JSON or protobuf logs.", "LogIngestResponse")),
+			"/v1/traces":                           pathItem(otlpOp("OTLP traces", "Ingest OTLP HTTP JSON or protobuf traces.", "TraceIngestResponse")),
 			"/api/openapi":                         pathItem(getOp("OpenAPI", "Return this OpenAPI 3.1 contract.", "read", schemaResponse("200", map[string]any{"type": "object"}), emptyResponse("401"))),
 		},
 		"components": map[string]any{
@@ -103,7 +103,6 @@ func openAPISchemas() map[string]any {
 		"MetricIngestResponse":        ingestResponse("metrics", "Metric"),
 		"LogIngestResponse":           ingestResponse("logs", "Log"),
 		"TraceIngestResponse":         ingestResponse("traces", "Trace"),
-		"OTLPAcceptedResponse":        schemaObject(nil, prop("accepted", integerSchema()), prop("signal", stringSchema())),
 	}
 }
 
@@ -133,13 +132,13 @@ func patchOp(summary, description, scope, requestSchema string, responses ...map
 	return op("patch", summary, description, scope, requestSchema, responses...)
 }
 
-func otlpOp(summary, description string) map[string]any {
-	operation := op("post", summary, description, "ingest", "", otlpProtobufResponse(), refResponse("202", "OTLPAcceptedResponse"), emptyResponse("400"), emptyResponse("401"), emptyResponse("415"))
+func otlpOp(summary, description, jsonResponseSchema string) map[string]any {
+	operation := op("post", summary, description, "ingest", "", otlpProtobufResponse(), refResponse("202", jsonResponseSchema), emptyResponse("400"), emptyResponse("401"), emptyResponse("415"))
 	operation["operation"].(map[string]any)["requestBody"] = map[string]any{
 		"required": true,
 		"content": map[string]any{
 			"application/json":       map[string]any{"schema": map[string]any{"type": "object"}},
-			"application/x-protobuf": map[string]any{"schema": map[string]any{"type": "string", "contentEncoding": "base64"}},
+			"application/x-protobuf": map[string]any{"schema": binarySchema()},
 		},
 	}
 	return operation
@@ -151,7 +150,7 @@ func otlpProtobufResponse() map[string]any {
 			"description": "OTLP protobuf accepted. SignalPlane returns HTTP 200 with an OTLP protobuf response envelope for protobuf requests.",
 			"content": map[string]any{
 				"application/x-protobuf": map[string]any{
-					"schema": map[string]any{"type": "string", "contentEncoding": "base64"},
+					"schema": binarySchema(),
 				},
 			},
 		},
@@ -299,6 +298,10 @@ func required(fields ...string) []string {
 
 func stringSchema() map[string]any {
 	return map[string]any{"type": "string"}
+}
+
+func binarySchema() map[string]any {
+	return map[string]any{"type": "string", "format": "binary"}
 }
 
 func dateTimeSchema() map[string]any {

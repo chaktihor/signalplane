@@ -170,7 +170,7 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	if !operationHasScope(notificationList, "admin") {
 		t.Fatal("expected notification channel list operation to require admin scope")
 	}
-	for _, path := range []string{"/v1/logs", "/v1/metrics", "/v1/traces"} {
+	for path, responseSchema := range map[string]string{"/v1/logs": "LogIngestResponse", "/v1/metrics": "MetricIngestResponse", "/v1/traces": "TraceIngestResponse"} {
 		operation := paths[path].(map[string]any)["post"].(map[string]any)
 		responses := operation["responses"].(map[string]any)
 		if _, ok := responses["200"]; !ok {
@@ -179,10 +179,21 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 		if _, ok := responses["202"]; !ok {
 			t.Fatalf("expected %s to document JSON 202 accepted success", path)
 		}
+		requestBody := operation["requestBody"].(map[string]any)
+		requestContent := requestBody["content"].(map[string]any)
+		protobufRequest := requestContent["application/x-protobuf"].(map[string]any)
+		assertBinarySchema(t, protobufRequest["schema"], path+" protobuf request")
 		response200 := responses["200"].(map[string]any)
 		content := response200["content"].(map[string]any)
-		if _, ok := content["application/x-protobuf"]; !ok {
+		protobufResponse, ok := content["application/x-protobuf"].(map[string]any)
+		if !ok {
 			t.Fatalf("expected %s 200 response to document application/x-protobuf", path)
+		}
+		assertBinarySchema(t, protobufResponse["schema"], path+" protobuf response")
+		response202 := responses["202"].(map[string]any)
+		jsonContent := response202["content"].(map[string]any)["application/json"].(map[string]any)
+		if got := schemaRef(t, jsonContent["schema"]); got != "#/components/schemas/"+responseSchema {
+			t.Fatalf("expected %s 202 response schema %s, got %s", path, responseSchema, got)
 		}
 	}
 	components := body["components"].(map[string]any)
@@ -231,6 +242,33 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	if _, ok := securitySchemes["signalplaneToken"]; !ok {
 		t.Fatal("expected signalplaneToken security scheme")
 	}
+}
+
+func assertBinarySchema(t *testing.T, schema any, label string) {
+	t.Helper()
+	body, ok := schema.(map[string]any)
+	if !ok {
+		t.Fatalf("expected %s schema object, got %T", label, schema)
+	}
+	if body["type"] != "string" || body["format"] != "binary" {
+		t.Fatalf("expected %s schema to be raw binary string, got %#v", label, body)
+	}
+	if _, ok := body["contentEncoding"]; ok {
+		t.Fatalf("did not expect %s schema to use contentEncoding/base64", label)
+	}
+}
+
+func schemaRef(t *testing.T, schema any) string {
+	t.Helper()
+	body, ok := schema.(map[string]any)
+	if !ok {
+		t.Fatalf("expected schema object, got %T", schema)
+	}
+	ref, ok := body["$ref"].(string)
+	if !ok {
+		t.Fatalf("expected schema $ref, got %#v", body)
+	}
+	return ref
 }
 
 func operationHasScope(operation map[string]any, scope string) bool {
