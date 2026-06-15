@@ -424,8 +424,15 @@ SignalPlane accepts OTLP HTTP JSON and protobuf payloads:
 
 These endpoints require an ingest or admin token and map OTLP resource attributes into SignalPlane service, host, environment, region, version, labels, and fields. Protobuf requests should use `Content-Type: application/x-protobuf`.
 
-## OpenAPI Placeholder
+## OpenAPI Contract
 
 ### `GET /api/openapi`
 
-Returns a lightweight API listing. A full OpenAPI schema is planned.
+Returns the authenticated OpenAPI 3.1 contract for the Silver API. The contract includes:
+
+- Bearer, `X-SignalPlane-Token`, and session-cookie security schemes.
+- Path definitions for read, admin, JSON ingestion, and OTLP HTTP ingestion APIs.
+- JSON request-body schemas for SignalPlane-native ingestion and configuration endpoints.
+- Response envelopes and shared schemas for resources, logs, metrics, traces, alerts, incidents, monitors, tokens, users, dependencies, and errors.
+
+Use this endpoint as the source for generated clients and customer-facing API review. It requires a read/admin token or login session when read auth is enabled.

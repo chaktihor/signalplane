@@ -435,11 +435,7 @@ func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizedRead(w, r) {
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"openapi": "3.1.0",
-		"info":    map[string]string{"title": "SignalPlane Silver API", "version": "0.1.0"},
-		"paths":   []string{"/healthz", "/api/auth/login", "/api/auth/logout", "/api/me", "/api/bootstrap", "/api/services", "/api/hosts", "/api/metrics", "/api/logs", "/api/traces", "/api/alerts", "/api/alert-rules", "/api/incidents", "/api/uptime-monitors", "/api/uptime-monitors/{id}/check", "/api/notification-channels", "/api/system/dependencies", "/api/tokens", "/api/users", "/api/ingest/hosts", "/api/ingest/metrics", "/api/ingest/logs", "/api/ingest/traces", "/v1/metrics", "/v1/logs", "/v1/traces"},
-	})
+	writeJSON(w, http.StatusOK, signalPlaneOpenAPI())
 }
 
 func (s *Server) authorized(w http.ResponseWriter, r *http.Request) bool {

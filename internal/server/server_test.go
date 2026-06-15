@@ -122,6 +122,62 @@ func TestReadEndpointsCanRequireReadToken(t *testing.T) {
 	}
 }
 
+func TestOpenAPIEndpointReturnsContract(t *testing.T) {
+	data := store.New()
+	data.CreateToken(store.TokenInput{Name: "reader", Token: "read-token", Scope: "read"})
+	app := New(Config{RequireReadAuth: true}, data, slog.Default())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/openapi", nil)
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusUnauthorized {
+		t.Fatalf("expected openapi to require read auth, got %d", resp.Code)
+	}
+
+	resp = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/openapi", nil)
+	req.Header.Set("Authorization", "Bearer read-token")
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected openapi 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode openapi response: %v", err)
+	}
+	if body["openapi"] != "3.1.0" {
+		t.Fatalf("expected openapi 3.1.0, got %#v", body["openapi"])
+	}
+	paths, ok := body["paths"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected paths object, got %T", body["paths"])
+	}
+	for _, path := range []string{"/api/logs", "/api/ingest/logs", "/v1/logs", "/api/openapi"} {
+		if _, ok := paths[path]; !ok {
+			t.Fatalf("expected path %s in openapi contract", path)
+		}
+	}
+	ingestLogs := paths["/api/ingest/logs"].(map[string]any)["post"].(map[string]any)
+	if _, ok := ingestLogs["requestBody"].(map[string]any); !ok {
+		t.Fatal("expected ingest logs operation to declare a request body")
+	}
+	components := body["components"].(map[string]any)
+	schemas := components["schemas"].(map[string]any)
+	for _, schema := range []string{"LogInput", "Log", "MetricInput", "TraceInput", "Error"} {
+		if _, ok := schemas[schema]; !ok {
+			t.Fatalf("expected schema %s in openapi contract", schema)
+		}
+	}
+	securitySchemes := components["securitySchemes"].(map[string]any)
+	if _, ok := securitySchemes["bearerAuth"]; !ok {
+		t.Fatal("expected bearerAuth security scheme")
+	}
+	if _, ok := securitySchemes["signalplaneToken"]; !ok {
+		t.Fatal("expected signalplaneToken security scheme")
+	}
+}
+
 func TestManualUptimeCheck(t *testing.T) {
 	data := store.New()
 	data.CreateToken(store.TokenInput{Name: "admin", Token: "admin-token", Scope: "admin"})
