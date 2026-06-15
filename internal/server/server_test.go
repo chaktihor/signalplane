@@ -7,9 +7,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/chaktihor/signalplane/internal/platform"
 	"github.com/chaktihor/signalplane/internal/store"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	metricspb "go.opentelemetry.io/proto/otlp/metrics/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestHealthAndBootstrap(t *testing.T) {
@@ -119,4 +126,100 @@ func TestDependencyEndpoint(t *testing.T) {
 	if body.Dependencies[0].Status != "down" {
 		t.Fatalf("expected dependency to be down, got %q", body.Dependencies[0].Status)
 	}
+}
+
+func TestOTLPHTTPProtobufIngestion(t *testing.T) {
+	data := store.New()
+	app := New(Config{IngestToken: "test-token"}, data, slog.Default())
+	now := uint64(time.Now().UTC().UnixNano())
+	resource := &resourcepb.Resource{Attributes: []*commonpb.KeyValue{
+		{Key: "service.name", Value: stringValue("proto-api")},
+		{Key: "host.name", Value: stringValue("proto-host")},
+		{Key: "deployment.environment", Value: stringValue("test")},
+	}}
+
+	postProto(t, app, "/v1/logs", &logspb.LogsData{
+		ResourceLogs: []*logspb.ResourceLogs{{
+			Resource: resource,
+			ScopeLogs: []*logspb.ScopeLogs{{
+				LogRecords: []*logspb.LogRecord{{
+					TimeUnixNano:   now,
+					SeverityNumber: logspb.SeverityNumber_SEVERITY_NUMBER_ERROR,
+					Body:           stringValue("proto failure"),
+					TraceId:        []byte("1234567890123456"),
+					SpanId:         []byte("12345678"),
+					Attributes: []*commonpb.KeyValue{
+						{Key: "component", Value: stringValue("checkout")},
+					},
+				}},
+			}},
+		}},
+	})
+	if logs := data.Logs(10, "proto-api", "error", "proto failure"); len(logs) != 1 {
+		t.Fatalf("expected one protobuf log, got %d", len(logs))
+	}
+
+	postProto(t, app, "/v1/metrics", &metricspb.MetricsData{
+		ResourceMetrics: []*metricspb.ResourceMetrics{{
+			Resource: resource,
+			ScopeMetrics: []*metricspb.ScopeMetrics{{
+				Metrics: []*metricspb.Metric{{
+					Name: "http.server.requests",
+					Unit: "1",
+					Data: &metricspb.Metric_Gauge{Gauge: &metricspb.Gauge{DataPoints: []*metricspb.NumberDataPoint{{
+						TimeUnixNano: now,
+						Value:        &metricspb.NumberDataPoint_AsDouble{AsDouble: 42},
+						Attributes: []*commonpb.KeyValue{
+							{Key: "route", Value: stringValue("/checkout")},
+						},
+					}}}},
+				}},
+			}},
+		}},
+	})
+	if metrics := data.Metrics(10); len(metrics) != 1 || metrics[0].Name != "http.server.requests" || metrics[0].Value != 42 {
+		t.Fatalf("expected protobuf metric, got %#v", metrics)
+	}
+
+	postProto(t, app, "/v1/traces", &tracepb.TracesData{
+		ResourceSpans: []*tracepb.ResourceSpans{{
+			Resource: resource,
+			ScopeSpans: []*tracepb.ScopeSpans{{
+				Spans: []*tracepb.Span{{
+					TraceId:           []byte("abcdefghijklmnop"),
+					SpanId:            []byte("span0001"),
+					Name:              "GET /checkout",
+					StartTimeUnixNano: now,
+					EndTimeUnixNano:   now + uint64((2 * time.Millisecond).Nanoseconds()),
+					Status:            &tracepb.Status{Code: tracepb.Status_STATUS_CODE_ERROR},
+				}},
+			}},
+		}},
+	})
+	if traces := data.Traces(10, "proto-api", "error"); len(traces) != 1 {
+		t.Fatalf("expected one protobuf trace, got %d", len(traces))
+	}
+}
+
+func postProto(t *testing.T, app *Server, path string, payload proto.Message) {
+	t.Helper()
+	body, err := proto.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal protobuf: %v", err)
+	}
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, path, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer test-token")
+	req.Header.Set("Content-Type", "application/x-protobuf")
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected protobuf OTLP 200 for %s, got %d: %s", path, resp.Code, resp.Body.String())
+	}
+	if got := resp.Header().Get("Content-Type"); got != "application/x-protobuf" {
+		t.Fatalf("expected protobuf response content type, got %q", got)
+	}
+}
+
+func stringValue(value string) *commonpb.AnyValue {
+	return &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: value}}
 }

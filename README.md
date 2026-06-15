@@ -27,6 +27,10 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 - [Telemetry Guide](docs/TELEMETRY_GUIDE.md)
 - [API Reference](docs/API_REFERENCE.md)
 - [Operations Guide](docs/OPERATIONS.md)
+- [On-Prem Deployment](docs/ON_PREM_DEPLOYMENT.md)
+- [HA Architecture](docs/HA_ARCHITECTURE.md)
+- [Air-Gapped Install](docs/AIR_GAPPED_INSTALL.md)
+- [Cloud Capacity Planning](docs/CLOUD_CAPACITY_PLANNING.md)
 - [Silver Quickstart](docs/SILVER_QUICKSTART.md)
 - [Silver Demo Runbook](docs/SILVER_DEMO_RUNBOOK.md)
 - [Silver Readiness](docs/SILVER_READINESS.md)
@@ -48,11 +52,11 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 
 ## Status
 
-SignalPlane now has a Silver self-hosted product baseline in this repository: a runnable Go service, embedded dashboard, HTTP JSON and OTLP HTTP JSON telemetry ingestion, login sessions, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival and query APIs, alert rules, notification channels, replay handling, and example telemetry producers.
+SignalPlane now has a Silver self-hosted product baseline in this repository: a runnable Go service, embedded dashboard, HTTP JSON and OTLP HTTP JSON/protobuf telemetry ingestion, login sessions, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival and query APIs, alert rules, notification channels, replay handling, Helm deployment assets, and example telemetry producers.
 
-The current implementation is suitable for local demos and small self-hosted pilots. Larger production rollouts should still add normalized PostgreSQL repositories, richer UI forms, OTLP protobuf/gRPC compatibility, and release/upgrade automation.
+The current implementation is suitable for local demos, on-prem pilots, and production-design validation. Larger production rollouts should still add normalized PostgreSQL repositories, richer UI forms, native OTLP gRPC ingestion, and release/upgrade automation.
 
-## Silver Developer Preview
+## Silver Self-Hosted Baseline
 
 The first Silver slice is a Go service that serves both the API and web UI.
 
@@ -84,13 +88,14 @@ Start here:
 
 - Single Go binary serving API and UI.
 - Podman Compose install.
+- Kubernetes Helm chart for on-prem/cloud deployment.
 - JSON or PostgreSQL-backed runtime persistence.
 - ClickHouse telemetry archival and query APIs for the full local stack.
 - Durable telemetry replay queue for failed ClickHouse writes.
 - Local users, login sessions, roles, and persisted scoped API tokens.
-- Metrics ingestion through SignalPlane JSON and OTLP HTTP JSON.
-- Log ingestion through SignalPlane JSON and OTLP HTTP JSON.
-- Trace ingestion through SignalPlane JSON and OTLP HTTP JSON.
+- Metrics ingestion through SignalPlane JSON, OTLP HTTP JSON, and OTLP HTTP protobuf.
+- Log ingestion through SignalPlane JSON, OTLP HTTP JSON, and OTLP HTTP protobuf.
+- Trace ingestion through SignalPlane JSON, OTLP HTTP JSON, and OTLP HTTP protobuf.
 - Host ingestion.
 - Service and host inference.
 - Error-log and error-trace alert creation.

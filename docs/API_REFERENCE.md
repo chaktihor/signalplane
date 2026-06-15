@@ -398,15 +398,15 @@ curl -X POST http://127.0.0.1:4318/api/notification-channels \
 
 Sends a test notification through the selected channel.
 
-## OTLP HTTP JSON
+## OTLP HTTP
 
-SignalPlane accepts OTLP HTTP JSON payloads:
+SignalPlane accepts OTLP HTTP JSON and protobuf payloads:
 
 - `POST /v1/metrics`
 - `POST /v1/logs`
 - `POST /v1/traces`
 
-These endpoints require an ingest or admin token and map OTLP resource attributes into SignalPlane service, host, environment, region, version, labels, and fields.
+These endpoints require an ingest or admin token and map OTLP resource attributes into SignalPlane service, host, environment, region, version, labels, and fields. Protobuf requests should use `Content-Type: application/x-protobuf`.
 
 ## OpenAPI Placeholder
 

@@ -1,0 +1,130 @@
+replicaCount: 2
+
+image:
+  repository: signalplane
+  tag: latest
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  fsGroup: 10001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10001
+
+service:
+  type: ClusterIP
+  port: 4318
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: signalplane.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 1Gi
+  limits:
+    cpu: "4"
+    memory: 4Gi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+persistence:
+  enabled: true
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+config:
+  seedDemoData: "false"
+  storeBackend: postgres
+  telemetryBackend: clickhouse
+  telemetryReplayPath: /data/telemetry-replay.jsonl
+  readTimeoutSeconds: "5"
+  writeTimeoutSeconds: "10"
+  idleTimeoutSeconds: "60"
+  postgresAddr: ""
+  postgresUser: signalplane
+  postgresDatabase: signalplane
+  postgresSSLMode: require
+  postgresTimeoutSeconds: "5"
+  clickhouseURL: http://clickhouse.signalplane.svc.cluster.local:8123
+  clickhouseDatabase: signalplane
+  clickhouseUser: signalplane
+  clickhouseTimeoutSeconds: "3"
+  clickhouseHTTPURL: http://clickhouse.signalplane.svc.cluster.local:8123/ping
+  otelGrpcAddr: ""
+  otelHttpAddr: ""
+  smtpAddr: ""
+  notificationFrom: signalplane@localhost
+  notificationTimeoutSeconds: "5"
+  mailpitURL: ""
+  secureCookies: "false"
+  cookieDomain: ""
+
+secret:
+  create: true
+  existingSecret: ""
+  keys:
+    ingestToken: ingest-token
+    bootstrapUserEmail: bootstrap-user-email
+    bootstrapUserPassword: bootstrap-user-password
+    postgresURL: postgres-url
+    postgresPassword: postgres-password
+    clickhousePassword: clickhouse-password
+  values:
+    ingestToken: change-me
+    bootstrapUserEmail: admin@signalplane.local
+    bootstrapUserPassword: change-me
+    postgresURL: postgres://signalplane:change-me@postgres.signalplane.svc.cluster.local:5432/signalplane?sslmode=require
+    postgresPassword: change-me
+    clickhousePassword: change-me
+
+extraEnv: []
+extraVolumes: []
+extraVolumeMounts: []
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+networkPolicy:
+  enabled: false
+  ingressNamespaceSelector: {}

@@ -27,6 +27,8 @@ type Config struct {
 	Dependencies       []platform.DependencyCheck
 	TelemetryReader    TelemetryReader
 	NotificationTester NotificationTester
+	SecureCookies      bool
+	CookieDomain       string
 }
 
 type TelemetryReader interface {
@@ -144,7 +146,9 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		Name:     "signalplane_session",
 		Value:    session.Token,
 		Path:     "/",
+		Domain:   s.cfg.CookieDomain,
 		HttpOnly: true,
+		Secure:   s.cfg.SecureCookies,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  parseCookieExpiry(session.ExpiresAt),
 	})
@@ -155,7 +159,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if token != "" {
 		s.store.RevokeSession(token)
 	}
-	http.SetCookie(w, &http.Cookie{Name: "signalplane_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: "signalplane_session", Value: "", Path: "/", Domain: s.cfg.CookieDomain, HttpOnly: true, Secure: s.cfg.SecureCookies, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {

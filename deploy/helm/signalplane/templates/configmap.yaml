@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "signalplane.fullname" . }}-config
+  labels:
+    {{- include "signalplane.labels" . | nindent 4 }}
+data:
+  SIGNALPLANE_ADDR: "0.0.0.0:{{ .Values.service.port }}"
+  SIGNALPLANE_DATA_PATH: "/data/signalplane.json"
+  SIGNALPLANE_SEED_DEMO_DATA: {{ .Values.config.seedDemoData | quote }}
+  SIGNALPLANE_STORE_BACKEND: {{ .Values.config.storeBackend | quote }}
+  SIGNALPLANE_TELEMETRY_BACKEND: {{ .Values.config.telemetryBackend | quote }}
+  SIGNALPLANE_TELEMETRY_REPLAY_PATH: {{ .Values.config.telemetryReplayPath | quote }}
+  SIGNALPLANE_READ_TIMEOUT_SECONDS: {{ .Values.config.readTimeoutSeconds | quote }}
+  SIGNALPLANE_WRITE_TIMEOUT_SECONDS: {{ .Values.config.writeTimeoutSeconds | quote }}
+  SIGNALPLANE_IDLE_TIMEOUT_SECONDS: {{ .Values.config.idleTimeoutSeconds | quote }}
+  SIGNALPLANE_POSTGRES_ADDR: {{ .Values.config.postgresAddr | quote }}
+  SIGNALPLANE_POSTGRES_USER: {{ .Values.config.postgresUser | quote }}
+  SIGNALPLANE_POSTGRES_DATABASE: {{ .Values.config.postgresDatabase | quote }}
+  SIGNALPLANE_POSTGRES_SSLMODE: {{ .Values.config.postgresSSLMode | quote }}
+  SIGNALPLANE_POSTGRES_TIMEOUT_SECONDS: {{ .Values.config.postgresTimeoutSeconds | quote }}
+  SIGNALPLANE_CLICKHOUSE_URL: {{ .Values.config.clickhouseURL | quote }}
+  SIGNALPLANE_CLICKHOUSE_DATABASE: {{ .Values.config.clickhouseDatabase | quote }}
+  SIGNALPLANE_CLICKHOUSE_USER: {{ .Values.config.clickhouseUser | quote }}
+  SIGNALPLANE_CLICKHOUSE_TIMEOUT_SECONDS: {{ .Values.config.clickhouseTimeoutSeconds | quote }}
+  SIGNALPLANE_CLICKHOUSE_HTTP_URL: {{ .Values.config.clickhouseHTTPURL | quote }}
+  SIGNALPLANE_OTEL_GRPC_ADDR: {{ .Values.config.otelGrpcAddr | quote }}
+  SIGNALPLANE_OTEL_HTTP_ADDR: {{ .Values.config.otelHttpAddr | quote }}
+  SIGNALPLANE_SMTP_ADDR: {{ .Values.config.smtpAddr | quote }}
+  SIGNALPLANE_NOTIFICATION_FROM: {{ .Values.config.notificationFrom | quote }}
+  SIGNALPLANE_NOTIFICATION_TIMEOUT_SECONDS: {{ .Values.config.notificationTimeoutSeconds | quote }}
+  SIGNALPLANE_MAILPIT_URL: {{ .Values.config.mailpitURL | quote }}
+  SIGNALPLANE_SECURE_COOKIES: {{ .Values.config.secureCookies | quote }}
+  SIGNALPLANE_COOKIE_DOMAIN: {{ .Values.config.cookieDomain | quote }}

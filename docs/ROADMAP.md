@@ -2,25 +2,27 @@
 
 ## Current Baseline
 
-The repository now contains a Silver developer preview:
+The repository now contains a Silver self-hosted baseline:
 
 - Single Go binary serving API and web UI.
 - Podman Compose stack.
-- File-backed JSON persistence.
+- File-backed JSON persistence and PostgreSQL-backed runtime persistence in the stack.
+- ClickHouse telemetry archival and query APIs.
 - Scoped API tokens.
-- HTTP JSON ingestion for metrics, logs, traces, and hosts.
+- HTTP JSON and OTLP HTTP JSON/protobuf ingestion for metrics, logs, traces, and hosts.
 - Inferred services and hosts.
-- Error-log and error-trace alert creation.
+- Built-in alerts, configurable metric/log alert rules, and notification channels.
 - Incident records.
 - Uptime monitor definitions and local checks.
+- Helm chart for on-prem/cloud Kubernetes deployment.
 - Example telemetry producers.
-- Installation, operations, telemetry, API, and user docs.
+- Installation, operations, telemetry, API, on-prem, HA, air-gap, cloud capacity, and user docs.
 
-This baseline proves the local product loop. The next work should make Silver genuinely useful before expanding into Gold.
+This baseline supports demos and on-prem pilot design. The next work should harden release/upgrade, UI workflows, and normalized storage before expanding into Gold.
 
 ## Next Engineering Priorities
 
-1. Replace custom JSON-only ingestion with OTLP HTTP/gRPC ingestion while keeping the simple JSON API for demos.
+1. Add native OTLP gRPC ingestion while keeping the simple JSON API and OTLP HTTP support.
 2. Add real authentication, session UI, and organization/user/role management.
 3. Build proper explorer pages for logs, traces, metrics, services, hosts, alerts, incidents, and uptime.
 4. Add configurable alert rules, notification channels, and uptime history.

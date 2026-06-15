@@ -34,6 +34,8 @@ func main() {
 		Dependencies:       platform.ChecksFromEnv(),
 		TelemetryReader:    telemetryReader,
 		NotificationTester: notificationDispatcher,
+		SecureCookies:      envBool("SIGNALPLANE_SECURE_COOKIES", false),
+		CookieDomain:       envString("SIGNALPLANE_COOKIE_DOMAIN", ""),
 	}
 
 	data, err := store.Open(store.Options{

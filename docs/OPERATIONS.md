@@ -1,6 +1,6 @@
 # SignalPlane Operations Guide
 
-This guide covers day-to-day operation of the Silver developer preview.
+This guide covers day-to-day operation of the Silver stack.
 
 ## Start And Stop
 
@@ -57,6 +57,8 @@ clickhouse-data
 signalplane-data
 ```
 
+Kubernetes Helm installs use one RWO PVC per SignalPlane replica for the telemetry replay queue. PostgreSQL stores runtime state and ClickHouse stores hot telemetry.
+
 ## Backup
 
 For local source runs, copy:
@@ -66,6 +68,14 @@ cp data/signalplane.json signalplane-backup.json
 ```
 
 For Podman Compose, copy from the running container or use a volume backup workflow.
+
+For Kubernetes production:
+
+- Back up PostgreSQL with PITR.
+- Back up ClickHouse schema and data.
+- Back up Helm values and Kubernetes runtime secrets.
+- Back up TLS and ingress configuration.
+- Monitor replay PVC usage and drain replay queues before planned ClickHouse maintenance.
 
 ## Restore
 
@@ -206,10 +216,10 @@ For source runs, dependency checks only appear when the corresponding `SIGNALPLA
 
 ## Production Caveat
 
-The Silver stack is ready for local demos and small pilots. Larger production rollouts should still add:
+The Silver stack now has the core self-hosted production shape: multiple SignalPlane replicas, PostgreSQL runtime persistence, ClickHouse telemetry archival, replay queues, alert rules, notifications, and Helm deployment assets. Larger production rollouts should still add:
 
 - Normalized PostgreSQL repositories for every control-plane entity.
 - Runtime retention settings and policy UI.
 - Uptime history and availability rollups.
-- OTLP protobuf/gRPC compatibility.
+- Native OTLP gRPC compatibility.
 - Release packaging, migrations, and upgrade automation.

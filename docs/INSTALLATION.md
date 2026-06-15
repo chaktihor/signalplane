@@ -9,6 +9,7 @@ SignalPlane currently ships as a single Go binary that includes:
 - HTTP API server.
 - Embedded web dashboard.
 - Metrics, logs, traces, host, service, alert, incident, uptime, and token APIs.
+- JSON and OTLP HTTP JSON/protobuf ingestion.
 - JSON snapshot persistence for quick local runs and PostgreSQL-backed runtime persistence in the platform stack.
 - Dependency health checks for the full local Silver platform stack.
 
@@ -44,6 +45,16 @@ Optional for examples:
 - Node.js for the Node test app.
 - Python 3 for Python test apps.
 - C compiler for the C host probe.
+
+For Kubernetes production installs:
+
+- Kubernetes 1.29+ or OpenShift 4.14+.
+- Helm 3.
+- HA PostgreSQL 16+.
+- HA ClickHouse 24.8+.
+- Private registry and image pull secret.
+- Ingress controller and TLS certificate.
+- Storage class for ReadWriteOnce replay PVCs.
 
 ## Option 1: Run From Source
 
@@ -148,6 +159,32 @@ If you need to use Docker-compatible Compose instead, override the command:
 CONTAINER_COMPOSE="docker compose" make stack-up
 ```
 
+## Option 4: Install On Kubernetes With Helm
+
+The Helm chart is in:
+
+```text
+deploy/helm/signalplane
+```
+
+Production installs should use external HA PostgreSQL and ClickHouse. See [On-Prem Deployment](ON_PREM_DEPLOYMENT.md) for the full secret, values, and verification workflow.
+
+Minimal install shape:
+
+```bash
+kubectl create namespace signalplane
+kubectl -n signalplane create secret generic signalplane-runtime \
+  --from-literal=ingest-token='<replace-me>' \
+  --from-literal=bootstrap-user-email='admin@customer.local' \
+  --from-literal=bootstrap-user-password='<replace-me>' \
+  --from-literal=postgres-url='postgres://signalplane:<password>@postgres.customer.local:5432/signalplane?sslmode=require' \
+  --from-literal=postgres-password='<postgres-password>' \
+  --from-literal=clickhouse-password='<clickhouse-password>'
+helm upgrade --install signalplane deploy/helm/signalplane \
+  --namespace signalplane \
+  --values deploy/helm/signalplane/examples/values-onprem-production.yaml
+```
+
 ## Configuration
 
 SignalPlane is configured with environment variables.
@@ -161,7 +198,7 @@ SignalPlane is configured with environment variables.
 | `SIGNALPLANE_DATA_PATH` | `data/signalplane.json` | File-backed persistence path |
 | `SIGNALPLANE_SEED_DEMO_DATA` | `true` | Seed demo services, metrics, logs, traces, and uptime monitor |
 | `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime store backend. Use `json` for a local snapshot or `postgres` for PostgreSQL-backed runtime state |
-| `SIGNALPLANE_TELEMETRY_BACKEND` | `json` | Telemetry archival backend. Use `clickhouse` with the local platform stack |
+| `SIGNALPLANE_TELEMETRY_BACKEND` | `json` | Telemetry archival backend. Use `clickhouse` with the local platform stack or production ClickHouse |
 | `SIGNALPLANE_TELEMETRY_REPLAY_PATH` | empty | Optional JSONL replay queue for failed telemetry archive writes |
 | `SIGNALPLANE_POSTGRES_ADDR` | empty | Optional dependency health check target |
 | `SIGNALPLANE_POSTGRES_URL` | empty | PostgreSQL connection URL used when `SIGNALPLANE_STORE_BACKEND=postgres` |
@@ -182,6 +219,8 @@ SignalPlane is configured with environment variables.
 | `SIGNALPLANE_NOTIFICATION_FROM` | `signalplane@localhost` | Sender used for email notification channels |
 | `SIGNALPLANE_NOTIFICATION_TIMEOUT_SECONDS` | `5` | Notification delivery timeout |
 | `SIGNALPLANE_MAILPIT_URL` | empty | Optional Mailpit web health check URL |
+| `SIGNALPLANE_SECURE_COOKIES` | `false` | Set `true` behind HTTPS ingress so browser session cookies require TLS |
+| `SIGNALPLANE_COOKIE_DOMAIN` | empty | Optional domain attribute for browser session cookies |
 | `SIGNALPLANE_READ_TIMEOUT_SECONDS` | `5` | HTTP read timeout |
 | `SIGNALPLANE_WRITE_TIMEOUT_SECONDS` | `10` | HTTP write timeout |
 | `SIGNALPLANE_IDLE_TIMEOUT_SECONDS` | `60` | HTTP idle timeout |

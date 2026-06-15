@@ -8,7 +8,7 @@ SignalPlane is Silver-ready for local self-hosted pilots and demos:
 
 - Single Go service with embedded dashboard and HTTP API.
 - JSON telemetry ingestion for metrics, logs, traces, and hosts.
-- OTLP HTTP JSON ingestion for metrics, logs, and traces.
+- OTLP HTTP JSON and protobuf ingestion for metrics, logs, and traces.
 - Service and host inference from resource metadata.
 - Built-in metric/log/trace/uptime alert creation.
 - Configurable metric and log alert rules.
@@ -19,6 +19,7 @@ SignalPlane is Silver-ready for local self-hosted pilots and demos:
 - Local user login sessions, roles, and user-management APIs.
 - Demo checkout application.
 - Podman Compose platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
+- Kubernetes Helm chart for SignalPlane API/UI deployment with probes, secrets, ingress, PDB, optional HPA, network policy, and per-replica replay PVCs.
 - Postgres schema for Silver control-plane metadata.
 - PostgreSQL-backed runtime snapshot persistence in the platform stack.
 - ClickHouse schema for telemetry-scale signal data.
@@ -26,7 +27,7 @@ SignalPlane is Silver-ready for local self-hosted pilots and demos:
 - ClickHouse-backed telemetry query APIs with runtime fallback.
 - Durable local telemetry replay queue for failed ClickHouse writes.
 - Platform dependency health checks in the UI.
-- End-user and operator documentation.
+- On-prem, HA, air-gapped, cloud capacity, end-user, and operator documentation.
 
 ## Remaining Silver Hardening
 
@@ -34,7 +35,7 @@ These are not blockers for a Silver pilot, but they should be completed before a
 
 - Login form in the web UI; the API login/session path is implemented.
 - Normalized organization, user, environment, role, token, dashboard, alert-rule, notification-channel, and audit repositories in PostgreSQL.
-- OTLP protobuf/gRPC native decoding; OTLP HTTP JSON is implemented.
+- Native OTLP gRPC ingestion; OTLP HTTP JSON and protobuf are implemented.
 - Trace and uptime alert-rule types; metric/log configurable rules are implemented.
 - Dashboard create/edit/clone/delete and JSON import/export.
 - Dedicated explorer pages for metrics, logs, traces, services, hosts, alerts, incidents, and uptime.
@@ -73,4 +74,4 @@ The next Silver-hardening slice should improve production ergonomics:
 - Web UI forms for login, alert rules, notification channels, and telemetry explorers.
 - Migration/version tracking.
 - Backfill/import path from JSON or PostgreSQL runtime snapshots for local developer continuity.
-- OTLP protobuf/gRPC compatibility.
+- Native OTLP gRPC compatibility.

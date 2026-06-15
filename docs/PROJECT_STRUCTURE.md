@@ -1,6 +1,6 @@
 # SignalPlane Project Structure
 
-This repository is now organized around a runnable Silver developer preview plus product and architecture documents for Gold and Platinum expansion.
+This repository is now organized around a runnable Silver self-hosted baseline plus product and architecture documents for Gold and Platinum expansion.
 
 ```text
 .

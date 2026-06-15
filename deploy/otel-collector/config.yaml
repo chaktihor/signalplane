@@ -15,6 +15,10 @@ processors:
     limit_mib: 256
 
 exporters:
+  otlphttp/signalplane:
+    endpoint: http://signalplane:4318
+    headers:
+      Authorization: Bearer dev-token
   debug:
     verbosity: normal
 
@@ -26,12 +30,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [debug]
+      exporters: [otlphttp/signalplane, debug]
     metrics:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [debug]
+      exporters: [otlphttp/signalplane, debug]
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch]
-      exporters: [debug]
+      exporters: [otlphttp/signalplane, debug]

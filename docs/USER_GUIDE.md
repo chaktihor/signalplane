@@ -1,6 +1,6 @@
 # SignalPlane User Guide
 
-This guide explains how to use the Silver developer preview after installation.
+This guide explains how to use the Silver self-hosted baseline after installation.
 
 ## Open The Dashboard
 
@@ -240,5 +240,5 @@ Silver still has these product-interface gaps:
 - Saved dashboards.
 - Dedicated explorer pages for each signal.
 - Runtime retention settings UI.
-- OTLP protobuf/gRPC compatibility.
+- Native OTLP gRPC compatibility.
 - Login, alert-rule, and notification-channel forms in the web UI; the APIs are available.

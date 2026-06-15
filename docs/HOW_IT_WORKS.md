@@ -156,7 +156,7 @@ Uptime monitors store HTTP check definitions and the local SignalPlane process c
 
 ## Request Flow
 
-1. An app sends telemetry to `/api/ingest/logs`, `/api/ingest/metrics`, `/api/ingest/traces`, `/api/ingest/hosts`, or OTLP HTTP JSON paths under `/v1`.
+1. An app sends telemetry to `/api/ingest/logs`, `/api/ingest/metrics`, `/api/ingest/traces`, `/api/ingest/hosts`, or OTLP HTTP JSON/protobuf paths under `/v1`.
 2. SignalPlane checks the token.
 3. SignalPlane normalizes resource metadata.
 4. SignalPlane creates or updates services and hosts.
@@ -194,4 +194,4 @@ The next Silver improvements should be:
 - Real service detail pages.
 - Better search and filtering.
 - GitHub Actions CI.
-- OTLP protobuf/gRPC compatibility.
+- Native OTLP gRPC compatibility.

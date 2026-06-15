@@ -43,6 +43,28 @@ Use `orders-dev-token` for ingestion:
 Authorization: Bearer orders-dev-token
 ```
 
+## OpenTelemetry
+
+SignalPlane accepts OTLP HTTP JSON and OTLP HTTP protobuf on the standard paths:
+
+```text
+POST /v1/metrics
+POST /v1/logs
+POST /v1/traces
+```
+
+Production collectors should forward to SignalPlane with the OTLP HTTP exporter:
+
+```yaml
+exporters:
+  otlphttp/signalplane:
+    endpoint: https://signalplane.customer.local
+    headers:
+      Authorization: Bearer ${SIGNALPLANE_INGEST_TOKEN}
+```
+
+Applications that emit OTLP gRPC should send to an OpenTelemetry Collector. The collector receives gRPC and forwards OTLP HTTP protobuf to SignalPlane.
+
 ## Resource Metadata
 
 Every telemetry payload should include resource metadata.
@@ -310,9 +332,9 @@ Supported examples:
 - Kubernetes-style workload metadata.
 - Uptime monitor registration.
 
-## OTLP HTTP JSON Support
+## OTLP HTTP Support
 
-Silver accepts OTLP HTTP JSON at:
+Silver accepts OTLP HTTP JSON and protobuf at:
 
 ```text
 POST /v1/metrics
@@ -336,4 +358,4 @@ SignalPlane maps OTLP resource attributes into the SignalPlane resource model:
 | `cloud.region` | `resource.region` |
 | `service.version` | `resource.version` |
 
-The local OpenTelemetry Collector exposes OTLP ports for compatibility. The native SignalPlane OTLP HTTP JSON endpoints are useful for SDKs/exporters that can send JSON OTLP directly. Protobuf OTLP support is a future compatibility hardening item.
+The local OpenTelemetry Collector exposes OTLP ports for compatibility and forwards OTLP HTTP protobuf to SignalPlane. Native SignalPlane OTLP gRPC ingestion is a future compatibility hardening item; use a collector when applications emit OTLP gRPC.

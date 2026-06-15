@@ -8,7 +8,7 @@ Silver is a self-hosted observability product for small teams and early adopters
 
 - SignalPlane API and web dashboard.
 - JSON telemetry ingestion for metrics, logs, traces, hosts, and uptime.
-- OTLP HTTP JSON ingestion at `/v1/metrics`, `/v1/logs`, and `/v1/traces`.
+- OTLP HTTP JSON and protobuf ingestion at `/v1/metrics`, `/v1/logs`, and `/v1/traces`.
 - PostgreSQL-backed runtime persistence in the Podman stack.
 - ClickHouse telemetry archival and ClickHouse-backed telemetry query APIs.
 - Durable telemetry replay queue for failed ClickHouse writes.
@@ -18,6 +18,7 @@ Silver is a self-hosted observability product for small teams and early adopters
 - Email, generic webhook, and Slack-compatible webhook notification channels.
 - Local user login sessions, roles, API tokens, and admin APIs.
 - Dependency health checks for PostgreSQL, ClickHouse, OpenTelemetry Collector, SMTP, and Mailpit.
+- Helm deployment assets for on-prem and cloud Kubernetes installs.
 
 ## Recommended Hardware
 
@@ -70,6 +71,7 @@ Containerized services:
 - ClickHouse 24.8.
 - OpenTelemetry Collector Contrib 0.111.
 - Mailpit for local email testing.
+- Helm 3 for Kubernetes installs.
 
 ## Install The Local Silver Stack
 
@@ -114,7 +116,7 @@ make stack-reset
 
 ## What Happens Under The Hood
 
-1. Applications send telemetry to SignalPlane JSON endpoints or OTLP HTTP JSON endpoints.
+1. Applications send telemetry to SignalPlane JSON endpoints or OTLP HTTP JSON/protobuf endpoints.
 2. SignalPlane authenticates the request with an API token.
 3. SignalPlane normalizes resource metadata such as service, host, environment, region, and version.
 4. SignalPlane infers services and hosts.
@@ -132,7 +134,7 @@ make stack-reset
 Logs can enter SignalPlane through:
 
 - `POST /api/ingest/logs`
-- `POST /v1/logs` for OTLP HTTP JSON
+- `POST /v1/logs` for OTLP HTTP JSON or protobuf
 
 Each log should include:
 
@@ -150,7 +152,7 @@ SignalPlane stores recent runtime state in PostgreSQL and archives logs to Click
 Metrics can enter through:
 
 - `POST /api/ingest/metrics`
-- `POST /v1/metrics` for OTLP HTTP JSON
+- `POST /v1/metrics` for OTLP HTTP JSON or protobuf
 
 Metric samples include name, value, unit, type, labels, and resource metadata. SignalPlane uses metric samples to update service health, trigger built-in threshold alerts, evaluate configured metric rules, and archive the sample to ClickHouse.
 
@@ -159,7 +161,7 @@ Metric samples include name, value, unit, type, labels, and resource metadata. S
 Traces can enter through:
 
 - `POST /api/ingest/traces`
-- `POST /v1/traces` for OTLP HTTP JSON
+- `POST /v1/traces` for OTLP HTTP JSON or protobuf
 
 SignalPlane groups spans by trace ID, infers service relationships from span resource metadata, stores recent runtime trace state, and archives traces and spans to ClickHouse tables `signalplane.traces` and `signalplane.spans`.
 
@@ -252,6 +254,8 @@ Roles:
 | `viewer` | Read only |
 
 API tokens are still the recommended path for collectors and applications.
+
+For HTTPS deployments, set `SIGNALPLANE_SECURE_COOKIES=true` so browser session cookies are only sent over TLS. Set `SIGNALPLANE_COOKIE_DOMAIN` when the customer requires an explicit cookie domain.
 
 ## Archival And Retention
 
