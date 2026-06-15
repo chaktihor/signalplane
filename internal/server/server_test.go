@@ -149,6 +149,9 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	if body["openapi"] != "3.1.0" {
 		t.Fatalf("expected openapi 3.1.0, got %#v", body["openapi"])
 	}
+	if _, ok := body["security"]; ok {
+		t.Fatal("did not expect global OpenAPI security; public operations must remain public unless secured explicitly")
+	}
 	paths, ok := body["paths"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected paths object, got %T", body["paths"])
@@ -244,6 +247,114 @@ func TestOpenAPIEndpointReturnsContract(t *testing.T) {
 	}
 }
 
+type openAPIRouteExpectation struct {
+	method   string
+	path     string
+	scope    string
+	statuses []string
+}
+
+func TestOpenAPIRouteMethodStatusAndAuthParity(t *testing.T) {
+	data := store.New()
+	data.CreateToken(store.TokenInput{Name: "reader", Token: "read-token", Scope: "read"})
+	app := New(Config{}, data, slog.Default())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/openapi", nil)
+	req.Header.Set("Authorization", "Bearer read-token")
+	app.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected openapi 200, got %d: %s", resp.Code, resp.Body.String())
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode openapi response: %v", err)
+	}
+	if _, ok := body["security"]; ok {
+		t.Fatal("did not expect global security; route auth parity must be operation-specific")
+	}
+	paths, ok := body["paths"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected paths object, got %T", body["paths"])
+	}
+
+	expectedRoutes := []openAPIRouteExpectation{
+		openAPIRoute("get", "/healthz", "", "200"),
+		openAPIRoute("post", "/api/auth/login", "", "200", "401"),
+		openAPIRoute("post", "/api/auth/logout", "", "204", "200"),
+		openAPIRoute("get", "/api/me", "session", "200", "401"),
+		openAPIRoute("get", "/api/bootstrap", "read", "200", "401"),
+		openAPIRoute("get", "/api/services", "read", "200", "401"),
+		openAPIRoute("get", "/api/hosts", "read", "200", "401"),
+		openAPIRoute("get", "/api/metrics", "read", "200", "401"),
+		openAPIRoute("get", "/api/logs", "read", "200", "401"),
+		openAPIRoute("get", "/api/traces", "read", "200", "401"),
+		openAPIRoute("get", "/api/alerts", "read", "200", "401"),
+		openAPIRoute("patch", "/api/alerts/{id}", "admin", "200", "401", "404"),
+		openAPIRoute("get", "/api/alert-rules", "admin", "200", "401"),
+		openAPIRoute("post", "/api/alert-rules", "admin", "201", "401"),
+		openAPIRoute("get", "/api/incidents", "read", "200", "401"),
+		openAPIRoute("post", "/api/incidents", "admin", "201", "401"),
+		openAPIRoute("get", "/api/uptime-monitors", "read", "200", "401"),
+		openAPIRoute("post", "/api/uptime-monitors", "admin", "201", "401"),
+		openAPIRoute("post", "/api/uptime-monitors/{id}/check", "admin", "200", "401", "404"),
+		openAPIRoute("get", "/api/notification-channels", "admin", "200", "401"),
+		openAPIRoute("post", "/api/notification-channels", "admin", "201", "401"),
+		openAPIRoute("post", "/api/notification-channels/{id}/test", "admin", "200", "401", "404"),
+		openAPIRoute("get", "/api/system/dependencies", "read", "200", "401"),
+		openAPIRoute("get", "/api/tokens", "admin", "200", "401"),
+		openAPIRoute("post", "/api/tokens", "admin", "201", "401"),
+		openAPIRoute("get", "/api/users", "admin", "200", "401"),
+		openAPIRoute("post", "/api/users", "admin", "201", "401"),
+		openAPIRoute("post", "/api/ingest/hosts", "ingest", "202", "401"),
+		openAPIRoute("post", "/api/ingest/metrics", "ingest", "202", "401"),
+		openAPIRoute("post", "/api/ingest/logs", "ingest", "202", "401"),
+		openAPIRoute("post", "/api/ingest/traces", "ingest", "202", "401"),
+		openAPIRoute("post", "/v1/metrics", "ingest", "200", "202", "400", "401", "415"),
+		openAPIRoute("post", "/v1/logs", "ingest", "200", "202", "400", "401", "415"),
+		openAPIRoute("post", "/v1/traces", "ingest", "200", "202", "400", "401", "415"),
+		openAPIRoute("get", "/api/openapi", "read", "200", "401"),
+	}
+
+	expectedMethodsByPath := map[string]map[string]bool{}
+	for _, route := range expectedRoutes {
+		operation := openAPIOperation(t, paths, route.method, route.path)
+		assertOpenAPIAuthScope(t, operation, route)
+		assertOpenAPIStatuses(t, operation, route)
+		if expectedMethodsByPath[route.path] == nil {
+			expectedMethodsByPath[route.path] = map[string]bool{}
+		}
+		expectedMethodsByPath[route.path][route.method] = true
+	}
+
+	if len(paths) != len(expectedMethodsByPath) {
+		t.Fatalf("expected %d documented paths, got %d", len(expectedMethodsByPath), len(paths))
+	}
+	for path, itemValue := range paths {
+		item, ok := itemValue.(map[string]any)
+		if !ok {
+			t.Fatalf("expected path %s item object, got %T", path, itemValue)
+		}
+		expectedMethods, ok := expectedMethodsByPath[path]
+		if !ok {
+			t.Fatalf("unexpected OpenAPI path %s", path)
+		}
+		if len(item) != len(expectedMethods) {
+			t.Fatalf("expected %s to document %d methods, got %d", path, len(expectedMethods), len(item))
+		}
+		for method := range item {
+			if !expectedMethods[method] {
+				t.Fatalf("unexpected OpenAPI method %s %s", method, path)
+			}
+		}
+	}
+}
+
+func openAPIRoute(method, path, scope string, statuses ...string) openAPIRouteExpectation {
+	return openAPIRouteExpectation{method: method, path: path, scope: scope, statuses: statuses}
+}
+
 func assertBinarySchema(t *testing.T, schema any, label string) {
 	t.Helper()
 	body, ok := schema.(map[string]any)
@@ -271,6 +382,93 @@ func schemaRef(t *testing.T, schema any) string {
 	return ref
 }
 
+func openAPIOperation(t *testing.T, paths map[string]any, method, path string) map[string]any {
+	t.Helper()
+	item, ok := paths[path].(map[string]any)
+	if !ok {
+		t.Fatalf("expected OpenAPI path %s", path)
+	}
+	operation, ok := item[method].(map[string]any)
+	if !ok {
+		t.Fatalf("expected OpenAPI operation %s %s", method, path)
+	}
+	return operation
+}
+
+func assertOpenAPIStatuses(t *testing.T, operation map[string]any, route openAPIRouteExpectation) {
+	t.Helper()
+	responses, ok := operation["responses"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected %s %s responses object, got %T", route.method, route.path, operation["responses"])
+	}
+	for _, status := range route.statuses {
+		if _, ok := responses[status]; !ok {
+			t.Fatalf("expected %s %s to document response status %s", route.method, route.path, status)
+		}
+	}
+}
+
+func assertOpenAPIAuthScope(t *testing.T, operation map[string]any, route openAPIRouteExpectation) {
+	t.Helper()
+	scopes := operationSecurityScopes(t, operation)
+	switch route.scope {
+	case "":
+		if len(scopes) != 0 {
+			t.Fatalf("expected %s %s to be public, got security %#v", route.method, route.path, scopes)
+		}
+	case "session":
+		if len(scopes) != 1 {
+			t.Fatalf("expected %s %s to be session-only, got security %#v", route.method, route.path, scopes)
+		}
+		values, ok := scopes["sessionCookie"]
+		if !ok || !containsString(values, "read") {
+			t.Fatalf("expected %s %s to require sessionCookie read auth, got %#v", route.method, route.path, scopes)
+		}
+		if _, ok := scopes["bearerAuth"]; ok {
+			t.Fatalf("did not expect %s %s to accept bearer auth", route.method, route.path)
+		}
+		if _, ok := scopes["signalplaneToken"]; ok {
+			t.Fatalf("did not expect %s %s to accept signalplane token auth", route.method, route.path)
+		}
+	default:
+		for _, scheme := range []string{"bearerAuth", "signalplaneToken", "sessionCookie"} {
+			values, ok := scopes[scheme]
+			if !ok || !containsString(values, route.scope) {
+				t.Fatalf("expected %s %s to require %s scope on %s, got %#v", route.method, route.path, route.scope, scheme, scopes)
+			}
+		}
+	}
+}
+
+func operationSecurityScopes(t *testing.T, operation map[string]any) map[string][]string {
+	t.Helper()
+	result := map[string][]string{}
+	security, ok := operation["security"].([]any)
+	if !ok {
+		return result
+	}
+	for _, item := range security {
+		scheme, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("expected security requirement object, got %T", item)
+		}
+		for name, rawScopes := range scheme {
+			values, ok := rawScopes.([]any)
+			if !ok {
+				t.Fatalf("expected security scopes for %s, got %T", name, rawScopes)
+			}
+			for _, value := range values {
+				scope, ok := value.(string)
+				if !ok {
+					t.Fatalf("expected security scope string for %s, got %T", name, value)
+				}
+				result[name] = append(result[name], scope)
+			}
+		}
+	}
+	return result
+}
+
 func operationHasScope(operation map[string]any, scope string) bool {
 	security, ok := operation["security"].([]any)
 	if !ok {
@@ -291,6 +489,15 @@ func operationHasScope(operation map[string]any, scope string) bool {
 					return true
 				}
 			}
+		}
+	}
+	return false
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
 		}
 	}
 	return false

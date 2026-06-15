@@ -9,16 +9,11 @@ func signalPlaneOpenAPI() map[string]any {
 			"description": "Authenticated ingestion, read, configuration, and platform-health APIs for SignalPlane Silver.",
 		},
 		"servers": []map[string]string{{"url": "/"}},
-		"security": []map[string][]string{
-			{"bearerAuth": {}},
-			{"signalplaneToken": {}},
-			{"sessionCookie": {}},
-		},
 		"paths": map[string]any{
 			"/healthz":                             pathItem(getOp("Health", "Unauthenticated liveness check.", "", refResponse("200", "HealthResponse"))),
 			"/api/auth/login":                      pathItem(postOp("Login", "Create a browser session.", "", "LoginRequest", refResponse("200", "LoginResponse"), emptyResponse("401"))),
 			"/api/auth/logout":                     pathItem(postOp("Logout", "Revoke the current browser session.", "", "", emptyResponse("204"), emptyResponse("200"))),
-			"/api/me":                              pathItem(getOp("Current user", "Return the authenticated user for the current session.", "read", refResponse("200", "MeResponse"), emptyResponse("401"))),
+			"/api/me":                              pathItem(getSessionOp("Current user", "Return the authenticated user for the current session.", refResponse("200", "MeResponse"), emptyResponse("401"))),
 			"/api/bootstrap":                       pathItem(getOp("Bootstrap", "Return dashboard bootstrap data and dependency health.", "read", refResponse("200", "BootstrapResponse"), emptyResponse("401"))),
 			"/api/services":                        pathItem(getOp("Services", "List inferred services.", "read", arrayResponse("200", "services", "Service"), emptyResponse("401"))),
 			"/api/hosts":                           pathItem(getOp("Hosts", "List inferred hosts.", "read", arrayResponse("200", "hosts", "Host"), emptyResponse("401"))),
@@ -118,6 +113,12 @@ func getOp(summary, description, scope string, responses ...map[string]any) map[
 	return op("get", summary, description, scope, "", responses...)
 }
 
+func getSessionOp(summary, description string, responses ...map[string]any) map[string]any {
+	operation := op("get", summary, description, "", "", responses...)
+	operation["operation"].(map[string]any)["security"] = sessionSecurity()
+	return operation
+}
+
 func postOp(summary, description, scope, requestSchema string, responses ...map[string]any) map[string]any {
 	return op("post", summary, description, scope, requestSchema, responses...)
 }
@@ -177,6 +178,12 @@ func securityForScope(scope string) []map[string][]string {
 		{"bearerAuth": {scope}},
 		{"signalplaneToken": {scope}},
 		{"sessionCookie": {scope}},
+	}
+}
+
+func sessionSecurity() []map[string][]string {
+	return []map[string][]string{
+		{"sessionCookie": {"read"}},
 	}
 }
 
