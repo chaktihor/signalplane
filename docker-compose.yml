@@ -63,10 +63,13 @@ services:
     environment:
       SIGNALPLANE_ADDR: "0.0.0.0:4318"
       SIGNALPLANE_INGEST_TOKEN: "dev-token"
+      SIGNALPLANE_BOOTSTRAP_USER_EMAIL: "admin@signalplane.local"
+      SIGNALPLANE_BOOTSTRAP_USER_PASSWORD: "admin-password"
       SIGNALPLANE_DATA_PATH: "/data/signalplane.json"
       SIGNALPLANE_SEED_DEMO_DATA: "true"
       SIGNALPLANE_STORE_BACKEND: "postgres"
       SIGNALPLANE_TELEMETRY_BACKEND: "clickhouse"
+      SIGNALPLANE_TELEMETRY_REPLAY_PATH: "/data/telemetry-replay.jsonl"
       SIGNALPLANE_POSTGRES_ADDR: "postgres:5432"
       SIGNALPLANE_POSTGRES_URL: "postgres://signalplane:signalplane@postgres:5432/signalplane?sslmode=disable"
       SIGNALPLANE_POSTGRES_USER: "signalplane"
@@ -80,6 +83,7 @@ services:
       SIGNALPLANE_OTEL_GRPC_ADDR: "otel-collector:4317"
       SIGNALPLANE_OTEL_HTTP_ADDR: "otel-collector:4318"
       SIGNALPLANE_SMTP_ADDR: "mailpit:1025"
+      SIGNALPLANE_NOTIFICATION_FROM: "signalplane@local.test"
       SIGNALPLANE_MAILPIT_URL: "http://mailpit:8025"
     depends_on:
       postgres:

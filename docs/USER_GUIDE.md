@@ -234,12 +234,11 @@ This sends telemetry from:
 
 ## Current Limitations
 
-Silver preview does not yet include:
+Silver still has these product-interface gaps:
 
-- Real login/session UI.
-- Configurable alert rules.
-- Notification channels.
 - Uptime history and availability rollups.
 - Saved dashboards.
-- OpenTelemetry OTLP ingestion.
-- ClickHouse-backed query APIs, production retention controls, and replay handling.
+- Dedicated explorer pages for each signal.
+- Runtime retention settings UI.
+- OTLP protobuf/gRPC compatibility.
+- Login, alert-rule, and notification-channel forms in the web UI; the APIs are available.

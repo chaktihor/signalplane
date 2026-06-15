@@ -26,10 +26,13 @@ function renderCounts(counts) {
   const metrics = [
     ["Services", counts.services],
     ["Hosts", counts.hosts],
+    ["Users", counts.users],
     ["Logs", counts.logs],
     ["Traces", counts.traces],
     ["Metrics", counts.metrics],
     ["Open alerts", counts.openAlerts],
+    ["Alert rules", counts.alertRules],
+    ["Channels", counts.notificationChannels],
     ["Incidents", counts.incidents],
     ["Uptime checks", counts.uptimeMonitors]
   ];

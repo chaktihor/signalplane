@@ -26,6 +26,7 @@ Start here if you are installing, evaluating, or operating SignalPlane.
 
 - [Silver Quickstart](SILVER_QUICKSTART.md)
 - [Silver Demo Runbook](SILVER_DEMO_RUNBOOK.md)
+- [Silver Operating Guide](SILVER_OPERATING_GUIDE.md)
 - [Silver Readiness](SILVER_READINESS.md)
 
-The Silver preview is a self-hosted developer preview with a Go API server, embedded dashboard, JSON telemetry ingestion, scoped tokens, JSON or PostgreSQL-backed runtime persistence, ClickHouse telemetry archival in the Podman stack, local uptime checks, and a live demo checkout application.
+The Silver stack is a self-hosted product baseline with a Go API server, embedded dashboard, JSON and OTLP HTTP JSON telemetry ingestion, login sessions, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival and query APIs, alert rules, notifications, local uptime checks, and a live demo checkout application.

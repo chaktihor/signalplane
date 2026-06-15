@@ -8,7 +8,7 @@ http://127.0.0.1:4318
 
 ## Authentication
 
-Ingestion, token-management, and state-changing configuration endpoints require an API token.
+Ingestion, token-management, user-management, alert-rule, notification-channel, and state-changing configuration endpoints require either an API token or a login session.
 
 Use:
 
@@ -27,6 +27,30 @@ Default local bootstrap/admin token:
 ```text
 dev-token
 ```
+
+Default local stack owner:
+
+```text
+admin@signalplane.local / admin-password
+```
+
+### `POST /api/auth/login`
+
+Creates a session cookie and returns the logged-in user.
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@signalplane.local","password":"admin-password"}'
+```
+
+### `GET /api/me`
+
+Returns the current session user.
+
+### `POST /api/auth/logout`
+
+Revokes the current session.
 
 ## Health
 
@@ -78,7 +102,7 @@ curl 'http://127.0.0.1:4318/api/hosts?limit=50'
 
 ### `GET /api/metrics`
 
-Returns recent metric samples.
+Returns recent metric samples. When ClickHouse is configured, results come from ClickHouse with runtime fallback.
 
 ```bash
 curl 'http://127.0.0.1:4318/api/metrics?limit=50'
@@ -101,7 +125,7 @@ curl -X POST http://127.0.0.1:4318/api/ingest/metrics \
 
 ### `GET /api/logs`
 
-Returns recent logs.
+Returns recent logs. When ClickHouse is configured, results come from ClickHouse with runtime fallback.
 
 Query parameters:
 
@@ -133,7 +157,7 @@ curl -X POST http://127.0.0.1:4318/api/ingest/logs \
 
 ### `GET /api/traces`
 
-Returns recent traces.
+Returns recent traces. When ClickHouse is configured, results come from ClickHouse with runtime fallback.
 
 Query parameters:
 
@@ -300,6 +324,89 @@ curl -X POST http://127.0.0.1:4318/api/tokens \
   -H "Content-Type: application/json" \
   -d '{"name":"orders-api","scope":"ingest","token":"orders-dev-token"}'
 ```
+
+## Users
+
+### `GET /api/users`
+
+Requires admin access.
+
+Returns local users without password hashes.
+
+```bash
+curl http://127.0.0.1:4318/api/users \
+  -H "Authorization: Bearer dev-token"
+```
+
+### `POST /api/users`
+
+Requires admin access.
+
+Creates a local user.
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/users \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"viewer@example.com","displayName":"Viewer","role":"viewer","password":"change-me"}'
+```
+
+## Alert Rules
+
+### `GET /api/alert-rules`
+
+Requires admin access.
+
+```bash
+curl http://127.0.0.1:4318/api/alert-rules \
+  -H "Authorization: Bearer dev-token"
+```
+
+### `POST /api/alert-rules`
+
+Requires admin access.
+
+Creates a metric or log alert rule.
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/alert-rules \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"High latency","signalType":"metric","metricName":"http.server.duration","operator":"gte","threshold":500,"severity":"warning"}'
+```
+
+## Notification Channels
+
+### `GET /api/notification-channels`
+
+Requires admin access.
+
+### `POST /api/notification-channels`
+
+Requires admin access.
+
+Creates an email, webhook, or Slack-compatible webhook channel.
+
+```bash
+curl -X POST http://127.0.0.1:4318/api/notification-channels \
+  -H "Authorization: Bearer dev-token" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Local email","type":"email","target":"oncall@signalplane.local"}'
+```
+
+### `POST /api/notification-channels/{id}/test`
+
+Sends a test notification through the selected channel.
+
+## OTLP HTTP JSON
+
+SignalPlane accepts OTLP HTTP JSON payloads:
+
+- `POST /v1/metrics`
+- `POST /v1/logs`
+- `POST /v1/traces`
+
+These endpoints require an ingest or admin token and map OTLP resource attributes into SignalPlane service, host, environment, region, version, labels, and fields.
 
 ## OpenAPI Placeholder
 

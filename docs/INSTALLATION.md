@@ -1,6 +1,6 @@
 # SignalPlane Installation Guide
 
-This guide explains how to install and run the Silver developer preview of SignalPlane.
+This guide explains how to install and run the Silver stack of SignalPlane.
 
 ## What You Are Installing
 
@@ -156,10 +156,13 @@ SignalPlane is configured with environment variables.
 |---|---|---|
 | `SIGNALPLANE_ADDR` | `127.0.0.1:4318` | Address and port for the HTTP server |
 | `SIGNALPLANE_INGEST_TOKEN` | `dev-token` | Local bootstrap/admin token |
+| `SIGNALPLANE_BOOTSTRAP_USER_EMAIL` | empty | Optional local owner account email created at startup |
+| `SIGNALPLANE_BOOTSTRAP_USER_PASSWORD` | empty | Optional local owner account password created at startup |
 | `SIGNALPLANE_DATA_PATH` | `data/signalplane.json` | File-backed persistence path |
 | `SIGNALPLANE_SEED_DEMO_DATA` | `true` | Seed demo services, metrics, logs, traces, and uptime monitor |
 | `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime store backend. Use `json` for a local snapshot or `postgres` for PostgreSQL-backed runtime state |
 | `SIGNALPLANE_TELEMETRY_BACKEND` | `json` | Telemetry archival backend. Use `clickhouse` with the local platform stack |
+| `SIGNALPLANE_TELEMETRY_REPLAY_PATH` | empty | Optional JSONL replay queue for failed telemetry archive writes |
 | `SIGNALPLANE_POSTGRES_ADDR` | empty | Optional dependency health check target |
 | `SIGNALPLANE_POSTGRES_URL` | empty | PostgreSQL connection URL used when `SIGNALPLANE_STORE_BACKEND=postgres` |
 | `SIGNALPLANE_POSTGRES_USER` | `signalplane` | PostgreSQL user used to build a connection URL when `SIGNALPLANE_POSTGRES_URL` is empty |
@@ -176,6 +179,8 @@ SignalPlane is configured with environment variables.
 | `SIGNALPLANE_OTEL_GRPC_ADDR` | empty | Optional OTLP gRPC dependency health check target |
 | `SIGNALPLANE_OTEL_HTTP_ADDR` | empty | Optional OTLP HTTP dependency health check target |
 | `SIGNALPLANE_SMTP_ADDR` | empty | Optional SMTP dependency health check target |
+| `SIGNALPLANE_NOTIFICATION_FROM` | `signalplane@localhost` | Sender used for email notification channels |
+| `SIGNALPLANE_NOTIFICATION_TIMEOUT_SECONDS` | `5` | Notification delivery timeout |
 | `SIGNALPLANE_MAILPIT_URL` | empty | Optional Mailpit web health check URL |
 | `SIGNALPLANE_READ_TIMEOUT_SECONDS` | `5` | HTTP read timeout |
 | `SIGNALPLANE_WRITE_TIMEOUT_SECONDS` | `10` | HTTP write timeout |

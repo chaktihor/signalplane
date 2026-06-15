@@ -310,7 +310,30 @@ Supported examples:
 - Kubernetes-style workload metadata.
 - Uptime monitor registration.
 
-## Future OpenTelemetry Support
+## OTLP HTTP JSON Support
 
-The current Silver preview uses SignalPlane JSON ingestion. A future milestone should add OTLP HTTP/gRPC ingestion so any OpenTelemetry-compatible language SDK can send telemetry directly.
+Silver accepts OTLP HTTP JSON at:
 
+```text
+POST /v1/metrics
+POST /v1/logs
+POST /v1/traces
+```
+
+Use the same ingest token headers as the SignalPlane JSON endpoints:
+
+```text
+Authorization: Bearer dev-token
+```
+
+SignalPlane maps OTLP resource attributes into the SignalPlane resource model:
+
+| OTLP attribute | SignalPlane field |
+|---|---|
+| `service.name` | `resource.service` |
+| `host.name`, `container.name`, `k8s.pod.name` | `resource.host` |
+| `deployment.environment`, `deployment.environment.name` | `resource.environment` |
+| `cloud.region` | `resource.region` |
+| `service.version` | `resource.version` |
+
+The local OpenTelemetry Collector exposes OTLP ports for compatibility. The native SignalPlane OTLP HTTP JSON endpoints are useful for SDKs/exporters that can send JSON OTLP directly. Protobuf OTLP support is a future compatibility hardening item.

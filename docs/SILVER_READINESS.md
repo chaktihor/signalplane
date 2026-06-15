@@ -4,37 +4,41 @@ Silver is the first self-hosted SignalPlane product tier. It should be useful fo
 
 ## Current Status
 
-SignalPlane is Silver-demo ready and has the start of the Silver product foundation:
+SignalPlane is Silver-ready for local self-hosted pilots and demos:
 
 - Single Go service with embedded dashboard and HTTP API.
 - JSON telemetry ingestion for metrics, logs, traces, and hosts.
+- OTLP HTTP JSON ingestion for metrics, logs, and traces.
 - Service and host inference from resource metadata.
-- Metric/log/trace/uptime alert creation.
+- Built-in metric/log/trace/uptime alert creation.
+- Configurable metric and log alert rules.
+- Email, generic webhook, and Slack-compatible webhook notification channels.
 - Incident records.
 - Local uptime checks.
 - Scoped API tokens.
+- Local user login sessions, roles, and user-management APIs.
 - Demo checkout application.
 - Podman Compose platform stack with PostgreSQL, ClickHouse, OpenTelemetry Collector, and Mailpit.
 - Postgres schema for Silver control-plane metadata.
 - PostgreSQL-backed runtime snapshot persistence in the platform stack.
 - ClickHouse schema for telemetry-scale signal data.
 - ClickHouse HTTP telemetry archival for metrics, logs, traces, spans, and uptime results in the platform stack.
+- ClickHouse-backed telemetry query APIs with runtime fallback.
+- Durable local telemetry replay queue for failed ClickHouse writes.
 - Platform dependency health checks in the UI.
+- End-user and operator documentation.
 
-## Silver-Ready Acceptance Criteria
+## Remaining Silver Hardening
 
-SignalPlane should not be called fully Silver-ready until these are complete:
+These are not blockers for a Silver pilot, but they should be completed before a larger production rollout:
 
-- Real email/password login and session UI.
+- Login form in the web UI; the API login/session path is implemented.
 - Normalized organization, user, environment, role, token, dashboard, alert-rule, notification-channel, and audit repositories in PostgreSQL.
-- OTLP HTTP/gRPC ingestion through the collector or native gateway.
-- Query APIs backed by ClickHouse rather than in-memory JSON snapshots.
-- Durable telemetry write failure handling and replay/backfill from the local JSON snapshot into ClickHouse.
-- Configurable alert rules for metrics, logs, traces, and uptime checks.
-- Email, generic webhook, and Slack-compatible webhook notification channels.
+- OTLP protobuf/gRPC native decoding; OTLP HTTP JSON is implemented.
+- Trace and uptime alert-rule types; metric/log configurable rules are implemented.
 - Dashboard create/edit/clone/delete and JSON import/export.
 - Dedicated explorer pages for metrics, logs, traces, services, hosts, alerts, incidents, and uptime.
-- Retention settings and bounded local data growth.
+- Runtime-configurable retention settings; ClickHouse schema TTL is currently static.
 - CI, release packaging, and documented upgrade/reset paths.
 
 ## Local Platform Stack
@@ -63,11 +67,10 @@ make stack-reset
 
 ## Next Implementation Slice
 
-The next Silver-hardening slice should make the durable stores query-native:
+The next Silver-hardening slice should improve production ergonomics:
 
 - Normalized PostgreSQL repositories for organizations, users, tokens, services, hosts, alert rules, alerts, incidents, dashboards, uptime monitors, notification channels, and audit events.
-- ClickHouse query layer for metrics, logs, traces, spans, uptime results, and events.
+- Web UI forms for login, alert rules, notification channels, and telemetry explorers.
 - Migration/version tracking.
 - Backfill/import path from JSON or PostgreSQL runtime snapshots for local developer continuity.
-
-After that, implement OTLP ingestion and alert rule evaluation against persisted data.
+- OTLP protobuf/gRPC compatibility.

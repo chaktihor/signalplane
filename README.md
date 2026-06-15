@@ -48,9 +48,9 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 
 ## Status
 
-SignalPlane now has a Silver developer-preview foundation in this repository: a runnable Go service, embedded dashboard, HTTP JSON telemetry ingestion, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival, and example telemetry producers.
+SignalPlane now has a Silver self-hosted product baseline in this repository: a runnable Go service, embedded dashboard, HTTP JSON and OTLP HTTP JSON telemetry ingestion, login sessions, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival and query APIs, alert rules, notification channels, replay handling, and example telemetry producers.
 
-The current implementation is not production-grade. It is the baseline for iterating toward the full Silver MVP, then Gold and Platinum capabilities.
+The current implementation is suitable for local demos and small self-hosted pilots. Larger production rollouts should still add normalized PostgreSQL repositories, richer UI forms, OTLP protobuf/gRPC compatibility, and release/upgrade automation.
 
 ## Silver Developer Preview
 
@@ -85,14 +85,17 @@ Start here:
 - Single Go binary serving API and UI.
 - Podman Compose install.
 - JSON or PostgreSQL-backed runtime persistence.
-- ClickHouse telemetry archival for the full local stack.
-- Persisted scoped API tokens.
-- Metrics ingestion.
-- Log ingestion.
-- Trace ingestion.
+- ClickHouse telemetry archival and query APIs for the full local stack.
+- Durable telemetry replay queue for failed ClickHouse writes.
+- Local users, login sessions, roles, and persisted scoped API tokens.
+- Metrics ingestion through SignalPlane JSON and OTLP HTTP JSON.
+- Log ingestion through SignalPlane JSON and OTLP HTTP JSON.
+- Trace ingestion through SignalPlane JSON and OTLP HTTP JSON.
 - Host ingestion.
 - Service and host inference.
 - Error-log and error-trace alert creation.
+- Configurable metric/log alert rules.
+- Email, generic webhook, and Slack-compatible webhook notification channels.
 - Incident records.
 - Uptime monitor definitions and local uptime checks.
 - Demo checkout application that continuously emits logs, metrics, traces, host telemetry, and uptime registration.

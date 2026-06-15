@@ -148,7 +148,7 @@ In the current Silver preview, alerts are created automatically from:
 - High latency metrics.
 - Failed uptime checks.
 
-Future Silver work will add configurable alert rules.
+Configurable metric and log alert rules run alongside the built-in Silver alert checks.
 
 ### Uptime Monitors
 
@@ -156,42 +156,42 @@ Uptime monitors store HTTP check definitions and the local SignalPlane process c
 
 ## Request Flow
 
-1. An app sends telemetry to `/api/ingest/logs`, `/api/ingest/metrics`, `/api/ingest/traces`, or `/api/ingest/hosts`.
+1. An app sends telemetry to `/api/ingest/logs`, `/api/ingest/metrics`, `/api/ingest/traces`, `/api/ingest/hosts`, or OTLP HTTP JSON paths under `/v1`.
 2. SignalPlane checks the token.
 3. SignalPlane normalizes resource metadata.
 4. SignalPlane creates or updates services and hosts.
 5. SignalPlane updates the runtime model used by the API and dashboard.
 6. SignalPlane persists that runtime snapshot to JSON or PostgreSQL, depending on `SIGNALPLANE_STORE_BACKEND`.
-7. If `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`, SignalPlane archives metrics, logs, traces, spans, and uptime results into ClickHouse.
-8. The dashboard reads data through APIs such as `/api/bootstrap`, `/api/services`, `/api/logs`, and `/api/traces`.
+7. SignalPlane evaluates built-in alerts and configured alert rules.
+8. If `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`, SignalPlane archives metrics, logs, traces, spans, and uptime results into ClickHouse.
+9. Failed ClickHouse writes are queued for replay when `SIGNALPLANE_TELEMETRY_REPLAY_PATH` is set.
+10. The dashboard reads data through APIs such as `/api/bootstrap`, `/api/services`, `/api/logs`, and `/api/traces`. Telemetry reads use ClickHouse when available and fall back to runtime state.
 
 ## Security Model In Silver
 
-The Silver preview has a simple token model:
+Silver has local users, login sessions, and API tokens:
 
 - `dev-token` is the default local bootstrap/admin token.
+- `SIGNALPLANE_BOOTSTRAP_USER_EMAIL` and `SIGNALPLANE_BOOTSTRAP_USER_PASSWORD` create the first owner account.
 - Tokens are persisted.
 - Tokens have scopes: `admin`, `ingest`, or `read`.
+- Users have roles: `owner`, `admin`, `editor`, or `viewer`.
 - Ingestion endpoints require a valid token.
 - Token management endpoints require admin access.
 - Alert status updates, incident creation, and uptime monitor creation require admin access.
-
-This is not a full user-login system yet.
 
 ## Persistence Model In Silver
 
 SignalPlane writes a runtime snapshot after state-changing operations.
 
-Source runs default to an atomic JSON file so the preview stays simple and installable. In the full Podman stack, runtime state is stored in PostgreSQL and telemetry is archived into ClickHouse. The dashboard and query APIs still read from the runtime model until the ClickHouse query layer and normalized PostgreSQL repositories are added.
+Source runs default to an atomic JSON file so the preview stays simple and installable. In the full Podman stack, runtime state is stored in PostgreSQL and telemetry is archived into ClickHouse. Telemetry query APIs read from ClickHouse when configured.
 
 ## What Comes Next
 
 The next Silver improvements should be:
 
-- Configurable alert rules.
-- Webhook/email notification channels.
 - Uptime history and availability rollups.
 - Real service detail pages.
 - Better search and filtering.
 - GitHub Actions CI.
-- OpenTelemetry ingestion.
+- OTLP protobuf/gRPC compatibility.

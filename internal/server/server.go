@@ -19,12 +19,24 @@ import (
 var webFS embed.FS
 
 type Config struct {
-	Addr         string
-	IngestToken  string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
-	Dependencies []platform.DependencyCheck
+	Addr               string
+	IngestToken        string
+	ReadTimeout        time.Duration
+	WriteTimeout       time.Duration
+	IdleTimeout        time.Duration
+	Dependencies       []platform.DependencyCheck
+	TelemetryReader    TelemetryReader
+	NotificationTester NotificationTester
+}
+
+type TelemetryReader interface {
+	Metrics(context.Context, int) ([]store.Metric, error)
+	Logs(context.Context, int, string, string, string) ([]store.Log, error)
+	Traces(context.Context, int, string, string) ([]store.Trace, error)
+}
+
+type NotificationTester interface {
+	TestNotification(context.Context, store.NotificationChannel) error
 }
 
 type Server struct {
@@ -73,6 +85,9 @@ func (s *Server) StartBackground(ctx context.Context) {
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.health)
+	s.mux.HandleFunc("POST /api/auth/login", s.login)
+	s.mux.HandleFunc("POST /api/auth/logout", s.logout)
+	s.mux.HandleFunc("GET /api/me", s.me)
 	s.mux.HandleFunc("GET /api/bootstrap", s.bootstrap)
 	s.mux.HandleFunc("GET /api/services", s.services)
 	s.mux.HandleFunc("GET /api/hosts", s.hosts)
@@ -81,18 +96,28 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/traces", s.traces)
 	s.mux.HandleFunc("GET /api/alerts", s.alerts)
 	s.mux.HandleFunc("PATCH /api/alerts/{id}", s.updateAlert)
+	s.mux.HandleFunc("GET /api/alert-rules", s.alertRules)
+	s.mux.HandleFunc("POST /api/alert-rules", s.createAlertRule)
 	s.mux.HandleFunc("GET /api/incidents", s.incidents)
 	s.mux.HandleFunc("POST /api/incidents", s.createIncident)
 	s.mux.HandleFunc("GET /api/uptime-monitors", s.uptimeMonitors)
 	s.mux.HandleFunc("POST /api/uptime-monitors", s.createUptimeMonitor)
 	s.mux.HandleFunc("POST /api/uptime-monitors/{id}/check", s.checkUptimeMonitor)
+	s.mux.HandleFunc("GET /api/notification-channels", s.notificationChannels)
+	s.mux.HandleFunc("POST /api/notification-channels", s.createNotificationChannel)
+	s.mux.HandleFunc("POST /api/notification-channels/{id}/test", s.testNotificationChannel)
 	s.mux.HandleFunc("GET /api/system/dependencies", s.dependencies)
 	s.mux.HandleFunc("GET /api/tokens", s.tokens)
 	s.mux.HandleFunc("POST /api/tokens", s.createToken)
+	s.mux.HandleFunc("GET /api/users", s.users)
+	s.mux.HandleFunc("POST /api/users", s.createUser)
 	s.mux.HandleFunc("POST /api/ingest/hosts", s.ingestHost)
 	s.mux.HandleFunc("POST /api/ingest/metrics", s.ingestMetrics)
 	s.mux.HandleFunc("POST /api/ingest/logs", s.ingestLogs)
 	s.mux.HandleFunc("POST /api/ingest/traces", s.ingestTraces)
+	s.mux.HandleFunc("POST /v1/metrics", s.ingestOTLPMetrics)
+	s.mux.HandleFunc("POST /v1/logs", s.ingestOTLPLogs)
+	s.mux.HandleFunc("POST /v1/traces", s.ingestOTLPTraces)
 	s.mux.HandleFunc("GET /api/openapi", s.openapi)
 
 	sub, _ := fs.Sub(webFS, "web")
@@ -101,6 +126,45 @@ func (s *Server) routes() {
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "signalplane", "timestamp": time.Now().UTC().Format(time.RFC3339Nano)})
+}
+func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	session, user, ok := s.store.Authenticate(input.Email, input.Password)
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "invalid email or password")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "signalplane_session",
+		Value:    session.Token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  parseCookieExpiry(session.ExpiresAt),
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"session": session, "user": user})
+}
+func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
+	token := sessionToken(r)
+	if token != "" {
+		s.store.RevokeSession(token)
+	}
+	http.SetCookie(w, &http.Cookie{Name: "signalplane_session", Value: "", Path: "/", HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+func (s *Server) me(w http.ResponseWriter, r *http.Request) {
+	user, ok := s.store.UserForSession(sessionToken(r))
+	if !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "login required")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": user})
 }
 func (s *Server) bootstrap(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, s.store.Summary())
@@ -112,14 +176,38 @@ func (s *Server) hosts(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"hosts": s.store.Hosts(limitParam(r))})
 }
 func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.TelemetryReader != nil {
+		metrics, err := s.cfg.TelemetryReader.Metrics(r.Context(), limitParam(r))
+		if err == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"metrics": metrics, "source": "clickhouse"})
+			return
+		}
+		s.logger.Warn("clickhouse metric query failed, falling back to runtime state", "error", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"metrics": s.store.Metrics(limitParam(r))})
 }
 func (s *Server) logs(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	if s.cfg.TelemetryReader != nil {
+		logs, err := s.cfg.TelemetryReader.Logs(r.Context(), limitParam(r), q.Get("service"), q.Get("severity"), q.Get("q"))
+		if err == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"logs": logs, "source": "clickhouse"})
+			return
+		}
+		s.logger.Warn("clickhouse log query failed, falling back to runtime state", "error", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"logs": s.store.Logs(limitParam(r), q.Get("service"), q.Get("severity"), q.Get("q"))})
 }
 func (s *Server) traces(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	if s.cfg.TelemetryReader != nil {
+		traces, err := s.cfg.TelemetryReader.Traces(r.Context(), limitParam(r), q.Get("service"), q.Get("status"))
+		if err == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"traces": traces, "source": "clickhouse"})
+			return
+		}
+		s.logger.Warn("clickhouse trace query failed, falling back to runtime state", "error", err)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"traces": s.store.Traces(limitParam(r), q.Get("service"), q.Get("status"))})
 }
 func (s *Server) alerts(w http.ResponseWriter, r *http.Request) {
@@ -128,8 +216,20 @@ func (s *Server) alerts(w http.ResponseWriter, r *http.Request) {
 func (s *Server) incidents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"incidents": s.store.Incidents(limitParam(r))})
 }
+func (s *Server) alertRules(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"alertRules": s.store.AlertRules(limitParam(r))})
+}
 func (s *Server) uptimeMonitors(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"uptimeMonitors": s.store.UptimeMonitors(limitParam(r))})
+}
+func (s *Server) notificationChannels(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"notificationChannels": s.store.NotificationChannels(limitParam(r))})
 }
 func (s *Server) dependencies(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -142,6 +242,12 @@ func (s *Server) tokens(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"tokens": s.store.Tokens(limitParam(r))})
 }
+func (s *Server) users(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"users": s.store.Users(limitParam(r))})
+}
 func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizedScope(w, r, "admin") {
 		return
@@ -151,6 +257,16 @@ func (s *Server) createToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"token": s.store.CreateToken(input)})
+}
+func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	var input store.UserInput
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"user": s.store.CreateUser(input)})
 }
 func (s *Server) createIncident(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizedScope(w, r, "admin") {
@@ -162,6 +278,16 @@ func (s *Server) createIncident(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"incident": s.store.CreateIncident(input)})
 }
+func (s *Server) createAlertRule(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	var input store.AlertRuleInput
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"alertRule": s.store.CreateAlertRule(input)})
+}
 func (s *Server) createUptimeMonitor(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizedScope(w, r, "admin") {
 		return
@@ -171,6 +297,35 @@ func (s *Server) createUptimeMonitor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"uptimeMonitor": s.store.CreateUptimeMonitor(input)})
+}
+func (s *Server) createNotificationChannel(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	var input store.NotificationChannelInput
+	if !decodeJSON(w, r, &input) {
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"notificationChannel": s.store.CreateNotificationChannel(input)})
+}
+func (s *Server) testNotificationChannel(w http.ResponseWriter, r *http.Request) {
+	if !s.authorizedScope(w, r, "admin") {
+		return
+	}
+	if s.cfg.NotificationTester == nil {
+		writeError(w, http.StatusBadRequest, "notifications_disabled", "notification delivery is not configured")
+		return
+	}
+	channel, ok := s.store.NotificationChannel(r.PathValue("id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "notification channel not found")
+		return
+	}
+	if err := s.cfg.NotificationTester.TestNotification(r.Context(), channel); err != nil {
+		writeError(w, http.StatusBadGateway, "notification_failed", err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
 }
 func (s *Server) checkUptimeMonitor(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizedScope(w, r, "admin") {
@@ -248,7 +403,7 @@ func (s *Server) openapi(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"openapi": "3.1.0",
 		"info":    map[string]string{"title": "SignalPlane Silver API", "version": "0.1.0"},
-		"paths":   []string{"/healthz", "/api/bootstrap", "/api/services", "/api/hosts", "/api/metrics", "/api/logs", "/api/traces", "/api/alerts", "/api/incidents", "/api/uptime-monitors", "/api/uptime-monitors/{id}/check", "/api/system/dependencies", "/api/tokens", "/api/ingest/hosts", "/api/ingest/metrics", "/api/ingest/logs", "/api/ingest/traces"},
+		"paths":   []string{"/healthz", "/api/auth/login", "/api/auth/logout", "/api/me", "/api/bootstrap", "/api/services", "/api/hosts", "/api/metrics", "/api/logs", "/api/traces", "/api/alerts", "/api/alert-rules", "/api/incidents", "/api/uptime-monitors", "/api/uptime-monitors/{id}/check", "/api/notification-channels", "/api/system/dependencies", "/api/tokens", "/api/users", "/api/ingest/hosts", "/api/ingest/metrics", "/api/ingest/logs", "/api/ingest/traces", "/v1/metrics", "/v1/logs", "/v1/traces"},
 	})
 }
 
@@ -265,8 +420,30 @@ func (s *Server) authorizedScope(w http.ResponseWriter, r *http.Request, scope s
 	if s.store.ValidToken(token, scope) || token == s.cfg.IngestToken {
 		return true
 	}
+	if s.store.ValidSession(sessionToken(r), scope) {
+		return true
+	}
 	writeError(w, http.StatusUnauthorized, "unauthorized", "provide API token with Authorization: Bearer <token> or X-SignalPlane-Token")
 	return false
+}
+
+func sessionToken(r *http.Request) string {
+	if value := strings.TrimSpace(r.Header.Get("X-SignalPlane-Session")); value != "" {
+		return value
+	}
+	cookie, err := r.Cookie("signalplane_session")
+	if err == nil {
+		return cookie.Value
+	}
+	return ""
+}
+
+func parseCookieExpiry(value string) time.Time {
+	expires, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return time.Now().UTC().Add(12 * time.Hour)
+	}
+	return expires
 }
 
 func writeJSON(w http.ResponseWriter, status int, body any) {

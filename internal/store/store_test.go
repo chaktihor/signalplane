@@ -132,3 +132,46 @@ func TestRecordUptimeResultUpdatesMonitorAndCreatesAlert(t *testing.T) {
 		t.Fatalf("expected recovered monitor, got status=%q failures=%d", updated.Status, updated.ConsecutiveFailures)
 	}
 }
+
+func TestMetricAlertRuleCreatesAlert(t *testing.T) {
+	s := New()
+	s.CreateAlertRule(AlertRuleInput{
+		Name:       "High latency",
+		SignalType: "metric",
+		MetricName: "http.server.duration",
+		Operator:   "gte",
+		Threshold:  500,
+		Severity:   "critical",
+	})
+	s.IngestMetrics([]MetricInput{{
+		Name: "http.server.duration", Value: 750, Unit: "ms", Type: "histogram",
+		Resource: Resource{Service: "checkout-api", Environment: "production"},
+	}})
+	alerts := s.Alerts(10)
+	if len(alerts) == 0 {
+		t.Fatal("expected alert rule to create an alert")
+	}
+	if alerts[0].Source != "alert-rule" {
+		t.Fatalf("expected alert-rule source, got %q", alerts[0].Source)
+	}
+}
+
+func TestAuthenticateCreatesSessionWithRoleScopes(t *testing.T) {
+	s, err := Open(Options{Seed: false, BootstrapUserEmail: "owner@example.com", BootstrapUserPassword: "secret"})
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	session, user, ok := s.Authenticate("owner@example.com", "secret")
+	if !ok {
+		t.Fatal("expected bootstrap user to authenticate")
+	}
+	if user.Role != "owner" {
+		t.Fatalf("expected owner role, got %q", user.Role)
+	}
+	if session.Token == "" {
+		t.Fatal("expected session token")
+	}
+	if !s.ValidSession(session.Token, "admin") {
+		t.Fatal("expected owner session to allow admin scope")
+	}
+}

@@ -2,6 +2,8 @@ package store
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,35 +14,45 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Store struct {
-	mu          sync.RWMutex
-	path        string
-	persistence stateStore
-	telemetry   TelemetrySink
-	org         Organization
-	envs        []Environment
-	tokens      map[string]APIToken
-	services    map[string]Service
-	hosts       map[string]Host
-	metrics     []Metric
-	logs        []Log
-	traces      []Trace
-	alerts      map[string]Alert
-	incidents   map[string]Incident
-	uptime      map[string]UptimeMonitor
-	audit       []AuditEvent
+	mu            sync.RWMutex
+	path          string
+	persistence   stateStore
+	telemetry     TelemetrySink
+	notifications NotificationSink
+	org           Organization
+	envs          []Environment
+	tokens        map[string]APIToken
+	users         map[string]User
+	sessions      map[string]Session
+	services      map[string]Service
+	hosts         map[string]Host
+	metrics       []Metric
+	logs          []Log
+	traces        []Trace
+	alerts        map[string]Alert
+	incidents     map[string]Incident
+	uptime        map[string]UptimeMonitor
+	alertRules    map[string]AlertRule
+	channels      map[string]NotificationChannel
+	audit         []AuditEvent
 }
 
 type Options struct {
-	Path            string
-	Backend         string
-	Seed            bool
-	BootstrapToken  string
-	TelemetrySink   TelemetrySink
-	PostgresURL     string
-	PostgresTimeout time.Duration
+	Path                  string
+	Backend               string
+	Seed                  bool
+	BootstrapToken        string
+	BootstrapUserEmail    string
+	BootstrapUserPassword string
+	TelemetrySink         TelemetrySink
+	NotificationSink      NotificationSink
+	PostgresURL           string
+	PostgresTimeout       time.Duration
 }
 
 type TelemetrySink interface {
@@ -48,6 +60,10 @@ type TelemetrySink interface {
 	WriteLogs([]Log) error
 	WriteTraces([]Trace) error
 	WriteUptimeResult(UptimeMonitor) error
+}
+
+type NotificationSink interface {
+	NotifyAlert(Alert, []NotificationChannel)
 }
 
 type stateStore interface {
@@ -60,18 +76,22 @@ type closeableStateStore interface {
 }
 
 type snapshot struct {
-	Organization Organization             `json:"organization"`
-	Environments []Environment            `json:"environments"`
-	Tokens       map[string]APIToken      `json:"tokens"`
-	Services     map[string]Service       `json:"services"`
-	Hosts        map[string]Host          `json:"hosts"`
-	Metrics      []Metric                 `json:"metrics"`
-	Logs         []Log                    `json:"logs"`
-	Traces       []Trace                  `json:"traces"`
-	Alerts       map[string]Alert         `json:"alerts"`
-	Incidents    map[string]Incident      `json:"incidents"`
-	Uptime       map[string]UptimeMonitor `json:"uptime"`
-	Audit        []AuditEvent             `json:"audit"`
+	Organization Organization                   `json:"organization"`
+	Environments []Environment                  `json:"environments"`
+	Tokens       map[string]APIToken            `json:"tokens"`
+	Users        map[string]User                `json:"users"`
+	Sessions     map[string]Session             `json:"sessions"`
+	Services     map[string]Service             `json:"services"`
+	Hosts        map[string]Host                `json:"hosts"`
+	Metrics      []Metric                       `json:"metrics"`
+	Logs         []Log                          `json:"logs"`
+	Traces       []Trace                        `json:"traces"`
+	Alerts       map[string]Alert               `json:"alerts"`
+	Incidents    map[string]Incident            `json:"incidents"`
+	Uptime       map[string]UptimeMonitor       `json:"uptime"`
+	AlertRules   map[string]AlertRule           `json:"alertRules"`
+	Channels     map[string]NotificationChannel `json:"notificationChannels"`
+	Audit        []AuditEvent                   `json:"audit"`
 }
 
 type Organization struct {
@@ -92,6 +112,32 @@ type APIToken struct {
 	Token     string `json:"token,omitempty"`
 	Scope     string `json:"scope"`
 	CreatedAt string `json:"createdAt"`
+	RevokedAt string `json:"revokedAt,omitempty"`
+}
+
+type User struct {
+	ID           string `json:"id"`
+	Email        string `json:"email"`
+	DisplayName  string `json:"displayName"`
+	Role         string `json:"role"`
+	PasswordHash string `json:"passwordHash,omitempty"`
+	CreatedAt    string `json:"createdAt"`
+	DisabledAt   string `json:"disabledAt,omitempty"`
+}
+
+type UserInput struct {
+	Email       string `json:"email"`
+	DisplayName string `json:"displayName"`
+	Role        string `json:"role"`
+	Password    string `json:"password"`
+}
+
+type Session struct {
+	ID        string `json:"id"`
+	UserID    string `json:"userId"`
+	Token     string `json:"token,omitempty"`
+	CreatedAt string `json:"createdAt"`
+	ExpiresAt string `json:"expiresAt"`
 	RevokedAt string `json:"revokedAt,omitempty"`
 }
 
@@ -199,6 +245,54 @@ type Alert struct {
 	ResolvedAt     string            `json:"resolvedAt,omitempty"`
 }
 
+type AlertRule struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	SignalType  string            `json:"signalType"`
+	Enabled     bool              `json:"enabled"`
+	MetricName  string            `json:"metricName,omitempty"`
+	LogSeverity string            `json:"logSeverity,omitempty"`
+	Query       string            `json:"query,omitempty"`
+	Operator    string            `json:"operator,omitempty"`
+	Threshold   float64           `json:"threshold,omitempty"`
+	Severity    string            `json:"severity"`
+	Labels      map[string]string `json:"labels"`
+	CreatedAt   string            `json:"createdAt"`
+	UpdatedAt   string            `json:"updatedAt"`
+}
+
+type AlertRuleInput struct {
+	Name        string            `json:"name"`
+	SignalType  string            `json:"signalType"`
+	Enabled     *bool             `json:"enabled,omitempty"`
+	MetricName  string            `json:"metricName"`
+	LogSeverity string            `json:"logSeverity"`
+	Query       string            `json:"query"`
+	Operator    string            `json:"operator"`
+	Threshold   float64           `json:"threshold"`
+	Severity    string            `json:"severity"`
+	Labels      map[string]string `json:"labels"`
+}
+
+type NotificationChannel struct {
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Type      string            `json:"type"`
+	Target    string            `json:"target"`
+	Enabled   bool              `json:"enabled"`
+	Config    map[string]string `json:"config"`
+	CreatedAt string            `json:"createdAt"`
+	UpdatedAt string            `json:"updatedAt"`
+}
+
+type NotificationChannelInput struct {
+	Name    string            `json:"name"`
+	Type    string            `json:"type"`
+	Target  string            `json:"target"`
+	Enabled *bool             `json:"enabled,omitempty"`
+	Config  map[string]string `json:"config"`
+}
+
 type Incident struct {
 	ID               string            `json:"id"`
 	Timestamp        string            `json:"timestamp"`
@@ -256,16 +350,19 @@ type Summary struct {
 }
 
 type Counts struct {
-	Services       int `json:"services"`
-	Hosts          int `json:"hosts"`
-	Tokens         int `json:"tokens"`
-	Metrics        int `json:"metrics"`
-	Logs           int `json:"logs"`
-	Traces         int `json:"traces"`
-	Alerts         int `json:"alerts"`
-	OpenAlerts     int `json:"openAlerts"`
-	Incidents      int `json:"incidents"`
-	UptimeMonitors int `json:"uptimeMonitors"`
+	Services             int `json:"services"`
+	Hosts                int `json:"hosts"`
+	Tokens               int `json:"tokens"`
+	Users                int `json:"users"`
+	Metrics              int `json:"metrics"`
+	Logs                 int `json:"logs"`
+	Traces               int `json:"traces"`
+	Alerts               int `json:"alerts"`
+	OpenAlerts           int `json:"openAlerts"`
+	Incidents            int `json:"incidents"`
+	UptimeMonitors       int `json:"uptimeMonitors"`
+	AlertRules           int `json:"alertRules"`
+	NotificationChannels int `json:"notificationChannels"`
 }
 
 type MetricInput struct {
@@ -333,14 +430,18 @@ type UptimeResult struct {
 func New() *Store {
 	stamp := now()
 	return &Store{
-		org:       Organization{ID: "org-default", Name: "SignalPlane Local", CreatedAt: stamp},
-		envs:      []Environment{{ID: "env-production", Name: "production", CreatedAt: stamp}},
-		tokens:    make(map[string]APIToken),
-		services:  make(map[string]Service),
-		hosts:     make(map[string]Host),
-		alerts:    make(map[string]Alert),
-		incidents: make(map[string]Incident),
-		uptime:    make(map[string]UptimeMonitor),
+		org:        Organization{ID: "org-default", Name: "SignalPlane Local", CreatedAt: stamp},
+		envs:       []Environment{{ID: "env-production", Name: "production", CreatedAt: stamp}},
+		tokens:     make(map[string]APIToken),
+		users:      make(map[string]User),
+		sessions:   make(map[string]Session),
+		services:   make(map[string]Service),
+		hosts:      make(map[string]Host),
+		alerts:     make(map[string]Alert),
+		incidents:  make(map[string]Incident),
+		uptime:     make(map[string]UptimeMonitor),
+		alertRules: make(map[string]AlertRule),
+		channels:   make(map[string]NotificationChannel),
 	}
 }
 
@@ -361,7 +462,9 @@ func Open(options Options) (*Store, error) {
 			loaded := storeFromSnapshot(snap)
 			loaded.persistence = persistence
 			loaded.telemetry = options.TelemetrySink
+			loaded.notifications = options.NotificationSink
 			loaded.ensureBootstrapToken(options.BootstrapToken)
+			loaded.ensureBootstrapUser(options.BootstrapUserEmail, options.BootstrapUserPassword)
 			return loaded, loaded.saveLocked()
 		}
 	}
@@ -375,7 +478,9 @@ func Open(options Options) (*Store, error) {
 	s.path = options.Path
 	s.persistence = persistence
 	s.telemetry = options.TelemetrySink
+	s.notifications = options.NotificationSink
 	s.ensureBootstrapToken(options.BootstrapToken)
+	s.ensureBootstrapUser(options.BootstrapUserEmail, options.BootstrapUserPassword)
 	if err := s.saveLocked(); err != nil {
 		return nil, err
 	}
@@ -481,6 +586,8 @@ func storeFromSnapshot(snap snapshot) *Store {
 	s.org = snap.Organization
 	s.envs = snap.Environments
 	s.tokens = snap.Tokens
+	s.users = snap.Users
+	s.sessions = snap.Sessions
 	s.services = snap.Services
 	s.hosts = snap.Hosts
 	s.metrics = snap.Metrics
@@ -489,6 +596,8 @@ func storeFromSnapshot(snap snapshot) *Store {
 	s.alerts = snap.Alerts
 	s.incidents = snap.Incidents
 	s.uptime = snap.Uptime
+	s.alertRules = snap.AlertRules
+	s.channels = snap.Channels
 	s.audit = snap.Audit
 	s.normalizeLoaded()
 	return s
@@ -503,6 +612,12 @@ func (s *Store) normalizeLoaded() {
 	}
 	if s.tokens == nil {
 		s.tokens = make(map[string]APIToken)
+	}
+	if s.users == nil {
+		s.users = make(map[string]User)
+	}
+	if s.sessions == nil {
+		s.sessions = make(map[string]Session)
 	}
 	if s.services == nil {
 		s.services = make(map[string]Service)
@@ -519,6 +634,12 @@ func (s *Store) normalizeLoaded() {
 	if s.uptime == nil {
 		s.uptime = make(map[string]UptimeMonitor)
 	}
+	if s.alertRules == nil {
+		s.alertRules = make(map[string]AlertRule)
+	}
+	if s.channels == nil {
+		s.channels = make(map[string]NotificationChannel)
+	}
 }
 
 func (s *Store) saveLocked() error {
@@ -526,6 +647,8 @@ func (s *Store) saveLocked() error {
 		Organization: s.org,
 		Environments: append([]Environment(nil), s.envs...),
 		Tokens:       cloneMapValues(s.tokens),
+		Users:        cloneMapValues(s.users),
+		Sessions:     cloneMapValues(s.sessions),
 		Services:     cloneMapValues(s.services),
 		Hosts:        cloneMapValues(s.hosts),
 		Metrics:      append([]Metric(nil), s.metrics...),
@@ -534,6 +657,8 @@ func (s *Store) saveLocked() error {
 		Alerts:       cloneMapValues(s.alerts),
 		Incidents:    cloneMapValues(s.incidents),
 		Uptime:       cloneMapValues(s.uptime),
+		AlertRules:   cloneMapValues(s.alertRules),
+		Channels:     cloneMapValues(s.channels),
 		Audit:        append([]AuditEvent(nil), s.audit...),
 	}
 	if s.persistence != nil {
@@ -555,6 +680,30 @@ func (s *Store) ensureBootstrapToken(token string) {
 		}
 	}
 	s.tokens["token-dev"] = APIToken{ID: "token-dev", Name: "local-dev", Token: token, Scope: "admin", CreatedAt: now()}
+}
+
+func (s *Store) ensureBootstrapUser(email, password string) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" || password == "" {
+		return
+	}
+	if s.users == nil {
+		s.users = make(map[string]User)
+	}
+	for _, existing := range s.users {
+		if existing.Email == email {
+			return
+		}
+	}
+	user := User{
+		ID:           "user-owner",
+		Email:        email,
+		DisplayName:  "SignalPlane Owner",
+		Role:         "owner",
+		PasswordHash: hashPassword(password),
+		CreatedAt:    now(),
+	}
+	s.users[user.ID] = user
 }
 
 func (s *Store) Summary() Summary {
@@ -585,7 +734,8 @@ func (s *Store) Summary() Summary {
 		Environments: append([]Environment(nil), s.envs...),
 		Counts: Counts{
 			Services: len(s.services), Hosts: len(s.hosts), Metrics: len(s.metrics), Logs: len(s.logs),
-			Tokens: len(s.tokens), Traces: len(s.traces), Alerts: len(s.alerts), OpenAlerts: open, Incidents: len(s.incidents), UptimeMonitors: len(s.uptime),
+			Tokens: len(s.tokens), Users: len(s.users), Traces: len(s.traces), Alerts: len(s.alerts), OpenAlerts: open, Incidents: len(s.incidents), UptimeMonitors: len(s.uptime),
+			AlertRules: len(s.alertRules), NotificationChannels: len(s.channels),
 		},
 		Health: health, RecentAlerts: take(alerts, 5), TopServices: take(services, 5), TopHosts: take(hosts, 5),
 	}
@@ -601,6 +751,122 @@ func (s *Store) ValidToken(token, scope string) bool {
 		return candidate.Scope == scope || candidate.Scope == "admin"
 	}
 	return false
+}
+
+func (s *Store) ValidSession(token, scope string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessionByTokenLocked(token)
+	if !ok {
+		return false
+	}
+	user, ok := s.users[session.UserID]
+	if !ok || user.DisabledAt != "" {
+		return false
+	}
+	return roleAllows(user.Role, scope)
+}
+
+func (s *Store) UserForSession(token string) (User, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	session, ok := s.sessionByTokenLocked(token)
+	if !ok {
+		return User{}, false
+	}
+	user, ok := s.users[session.UserID]
+	if !ok {
+		return User{}, false
+	}
+	user.PasswordHash = ""
+	return user, true
+}
+
+func (s *Store) sessionByTokenLocked(token string) (Session, bool) {
+	if token == "" {
+		return Session{}, false
+	}
+	nowTime := time.Now().UTC()
+	for _, session := range s.sessions {
+		if session.Token != token || session.RevokedAt != "" {
+			continue
+		}
+		expires, err := time.Parse(time.RFC3339Nano, session.ExpiresAt)
+		if err == nil && nowTime.After(expires) {
+			return Session{}, false
+		}
+		return session, true
+	}
+	return Session{}, false
+}
+
+func (s *Store) Authenticate(email, password string) (Session, User, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	email = strings.ToLower(strings.TrimSpace(email))
+	for _, user := range s.users {
+		if user.Email != email || user.DisabledAt != "" {
+			continue
+		}
+		if !verifyPassword(password, user.PasswordHash) {
+			break
+		}
+		session := Session{
+			ID:        newID("ses"),
+			UserID:    user.ID,
+			Token:     newID("sp_session"),
+			CreatedAt: now(),
+			ExpiresAt: time.Now().UTC().Add(12 * time.Hour).Format(time.RFC3339Nano),
+		}
+		s.sessions[session.ID] = session
+		s.auditLocked("user.login", "user", user.ID, nil)
+		_ = s.saveLocked()
+		user.PasswordHash = ""
+		return session, user, true
+	}
+	return Session{}, User{}, false
+}
+
+func (s *Store) RevokeSession(token string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, session := range s.sessions {
+		if session.Token == token && session.RevokedAt == "" {
+			session.RevokedAt = now()
+			s.sessions[id] = session
+			_ = s.saveLocked()
+			return
+		}
+	}
+}
+
+func (s *Store) Users(max int) []User {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	users := mapValues(s.users)
+	sort.SliceStable(users, func(i, j int) bool { return users[i].Email < users[j].Email })
+	for i := range users {
+		users[i].PasswordHash = ""
+	}
+	return take(users, saneLimit(max))
+}
+
+func (s *Store) CreateUser(input UserInput) User {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	user := User{
+		ID:           newID("usr"),
+		Email:        strings.ToLower(strings.TrimSpace(input.Email)),
+		DisplayName:  firstNonEmpty(input.DisplayName, input.Email),
+		Role:         normalizeRole(input.Role),
+		PasswordHash: hashPassword(input.Password),
+		CreatedAt:    now(),
+	}
+	s.users[user.ID] = user
+	s.auditLocked("user.created", "user", user.ID, map[string]string{"role": user.Role})
+	_ = s.saveLocked()
+	user.PasswordHash = ""
+	return user
 }
 
 func (s *Store) Tokens(max int) []APIToken {
@@ -633,6 +899,80 @@ func (s *Store) CreateToken(input TokenInput) APIToken {
 	return token
 }
 
+func (s *Store) AlertRules(max int) []AlertRule {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rules := mapValues(s.alertRules)
+	sort.SliceStable(rules, func(i, j int) bool { return rules[i].Name < rules[j].Name })
+	return take(rules, saneLimit(max))
+}
+
+func (s *Store) CreateAlertRule(input AlertRuleInput) AlertRule {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	enabled := true
+	if input.Enabled != nil {
+		enabled = *input.Enabled
+	}
+	rule := AlertRule{
+		ID:          newID("arl"),
+		Name:        firstNonEmpty(input.Name, "alert-rule"),
+		SignalType:  normalizeSignalType(input.SignalType),
+		Enabled:     enabled,
+		MetricName:  input.MetricName,
+		LogSeverity: normalizeSeverity(input.LogSeverity),
+		Query:       input.Query,
+		Operator:    normalizeOperator(input.Operator),
+		Threshold:   input.Threshold,
+		Severity:    normalizeAlertSeverity(input.Severity),
+		Labels:      cloneMap(input.Labels),
+		CreatedAt:   now(),
+		UpdatedAt:   now(),
+	}
+	s.alertRules[rule.ID] = rule
+	s.auditLocked("alert_rule.created", "alertRule", rule.ID, map[string]string{"signalType": rule.SignalType})
+	_ = s.saveLocked()
+	return rule
+}
+
+func (s *Store) NotificationChannels(max int) []NotificationChannel {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	channels := mapValues(s.channels)
+	sort.SliceStable(channels, func(i, j int) bool { return channels[i].Name < channels[j].Name })
+	return take(channels, saneLimit(max))
+}
+
+func (s *Store) NotificationChannel(id string) (NotificationChannel, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	channel, ok := s.channels[id]
+	return channel, ok
+}
+
+func (s *Store) CreateNotificationChannel(input NotificationChannelInput) NotificationChannel {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	enabled := true
+	if input.Enabled != nil {
+		enabled = *input.Enabled
+	}
+	channel := NotificationChannel{
+		ID:        newID("chn"),
+		Name:      firstNonEmpty(input.Name, input.Target, "notification-channel"),
+		Type:      normalizeChannelType(input.Type),
+		Target:    input.Target,
+		Enabled:   enabled,
+		Config:    cloneMap(input.Config),
+		CreatedAt: now(),
+		UpdatedAt: now(),
+	}
+	s.channels[channel.ID] = channel
+	s.auditLocked("notification_channel.created", "notificationChannel", channel.ID, map[string]string{"type": channel.Type})
+	_ = s.saveLocked()
+	return channel
+}
+
 func (s *Store) UpsertHost(input HostInput) Host {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -655,6 +995,7 @@ func (s *Store) IngestMetrics(inputs []MetricInput) []Metric {
 		s.metrics = prependBounded(s.metrics, metric, 5000)
 		s.updateServiceStatsFromMetricLocked(metric)
 		s.evaluateMetricAlertLocked(metric)
+		s.evaluateMetricRulesLocked(metric)
 		out = append(out, metric)
 	}
 	_ = s.saveLocked()
@@ -685,6 +1026,7 @@ func (s *Store) IngestLogs(inputs []LogInput) []Log {
 				Message: log.Message, RelatedLogID: log.ID,
 			})
 		}
+		s.evaluateLogRulesLocked(log)
 	}
 	_ = s.saveLocked()
 	sink := s.telemetry
@@ -986,6 +1328,7 @@ func (s *Store) createAlertLocked(input Alert) Alert {
 	}
 	s.alerts[alert.ID] = alert
 	s.auditLocked("alert.created", "alert", alert.ID, map[string]string{"source": alert.Source})
+	s.notifyAlertLocked(alert)
 	return alert
 }
 
@@ -999,10 +1342,27 @@ func (s *Store) createAlertOnceLocked(input Alert) Alert {
 				existing.Labels = input.Labels
 			}
 			s.alerts[existing.ID] = existing
+			s.notifyAlertLocked(existing)
 			return existing
 		}
 	}
 	return s.createAlertLocked(input)
+}
+
+func (s *Store) notifyAlertLocked(alert Alert) {
+	if s.notifications == nil {
+		return
+	}
+	channels := make([]NotificationChannel, 0, len(s.channels))
+	for _, channel := range s.channels {
+		if channel.Enabled {
+			channels = append(channels, channel)
+		}
+	}
+	if len(channels) == 0 {
+		return
+	}
+	go s.notifications.NotifyAlert(alert, channels)
 }
 
 func (s *Store) updateServiceStatsFromMetricLocked(metric Metric) {
@@ -1072,6 +1432,70 @@ func (s *Store) evaluateMetricAlertLocked(metric Metric) {
 	}
 }
 
+func (s *Store) evaluateMetricRulesLocked(metric Metric) {
+	for _, rule := range s.alertRules {
+		if !rule.Enabled || rule.SignalType != "metric" {
+			continue
+		}
+		if rule.MetricName != "" && rule.MetricName != metric.Name {
+			continue
+		}
+		if !compare(metric.Value, rule.Operator, rule.Threshold) {
+			continue
+		}
+		entity := firstNonEmpty(metric.Resource.Service, metric.Resource.Host, metric.Name)
+		s.createAlertOnceLocked(Alert{
+			Title:    firstNonEmpty(rule.Name, "Metric rule triggered") + ": " + metric.Name,
+			Severity: rule.Severity,
+			Source:   "alert-rule",
+			EntityID: entity,
+			Message:  metric.Name + " is " + formatFloat(metric.Value) + " " + metric.Unit + " (" + rule.Operator + " " + formatFloat(rule.Threshold) + ")",
+			Labels:   mergeStringMaps(rule.Labels, map[string]string{"rule": rule.ID, "metric": metric.Name, "signal": "metric"}),
+		})
+	}
+}
+
+func (s *Store) evaluateLogRulesLocked(log Log) {
+	for _, rule := range s.alertRules {
+		if !rule.Enabled || rule.SignalType != "log" {
+			continue
+		}
+		if rule.LogSeverity != "" && rule.LogSeverity != "info" && rule.LogSeverity != log.Severity {
+			continue
+		}
+		if rule.Query != "" && !strings.Contains(strings.ToLower(log.Message), strings.ToLower(rule.Query)) {
+			continue
+		}
+		entity := firstNonEmpty(log.Resource.Service, log.Resource.Host, "logs")
+		s.createAlertOnceLocked(Alert{
+			Title:        firstNonEmpty(rule.Name, "Log rule triggered"),
+			Severity:     rule.Severity,
+			Source:       "alert-rule",
+			EntityID:     entity,
+			Message:      log.Message,
+			RelatedLogID: log.ID,
+			Labels:       mergeStringMaps(rule.Labels, map[string]string{"rule": rule.ID, "severity": log.Severity, "signal": "log"}),
+		})
+	}
+}
+
+func compare(value float64, operator string, threshold float64) bool {
+	switch normalizeOperator(operator) {
+	case "gt":
+		return value > threshold
+	case "gte":
+		return value >= threshold
+	case "lt":
+		return value < threshold
+	case "lte":
+		return value <= threshold
+	case "eq":
+		return value == threshold
+	default:
+		return value >= threshold
+	}
+}
+
 func (s *Store) auditLocked(action, entityType, entityID string, details map[string]string) {
 	s.audit = prependBounded(s.audit, AuditEvent{ID: newID("aud"), Timestamp: now(), Action: action, EntityType: entityType, EntityID: entityID, Details: details}, 1000)
 }
@@ -1137,6 +1561,71 @@ func normalizeAlertSeverity(value string) string {
 		return "warning"
 	}
 }
+func normalizeSignalType(value string) string {
+	switch strings.ToLower(value) {
+	case "metric", "log":
+		return strings.ToLower(value)
+	default:
+		return "metric"
+	}
+}
+func normalizeOperator(value string) string {
+	switch strings.ToLower(value) {
+	case "gt", "gte", "lt", "lte", "eq":
+		return strings.ToLower(value)
+	default:
+		return "gte"
+	}
+}
+func normalizeChannelType(value string) string {
+	switch strings.ToLower(value) {
+	case "email", "webhook", "slack_webhook":
+		return strings.ToLower(value)
+	default:
+		return "webhook"
+	}
+}
+func normalizeRole(value string) string {
+	switch strings.ToLower(value) {
+	case "owner", "admin", "editor", "viewer":
+		return strings.ToLower(value)
+	default:
+		return "viewer"
+	}
+}
+func roleAllows(role, scope string) bool {
+	switch normalizeRole(role) {
+	case "owner", "admin":
+		return true
+	case "editor":
+		return scope == "ingest" || scope == "read"
+	case "viewer":
+		return scope == "read"
+	default:
+		return false
+	}
+}
+func hashPassword(password string) string {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return ""
+	}
+	return string(hash)
+}
+func verifyPassword(password, encoded string) bool {
+	if encoded == "" {
+		return false
+	}
+	if strings.HasPrefix(encoded, "$2a$") || strings.HasPrefix(encoded, "$2b$") || strings.HasPrefix(encoded, "$2y$") {
+		return bcrypt.CompareHashAndPassword([]byte(encoded), []byte(password)) == nil
+	}
+	parts := strings.SplitN(encoded, ":", 2)
+	if len(parts) != 2 {
+		return false
+	}
+	sum := sha256.Sum256([]byte(parts[0] + ":" + password))
+	return subtle.ConstantTimeCompare([]byte(parts[1]), []byte(hex.EncodeToString(sum[:]))) == 1
+}
 func severityForLog(value string) string {
 	if value == "fatal" {
 		return "critical"
@@ -1176,6 +1665,15 @@ func cloneMap(input map[string]string) map[string]string {
 	out := map[string]string{}
 	for key, value := range input {
 		out[key] = value
+	}
+	return out
+}
+func mergeStringMaps(inputs ...map[string]string) map[string]string {
+	out := map[string]string{}
+	for _, input := range inputs {
+		for key, value := range input {
+			out[key] = value
+		}
 	}
 	return out
 }
