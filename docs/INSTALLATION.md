@@ -9,7 +9,7 @@ SignalPlane currently ships as a single Go binary that includes:
 - HTTP API server.
 - Embedded web dashboard.
 - Metrics, logs, traces, host, service, alert, incident, uptime, and token APIs.
-- File-backed persistence using an atomic JSON snapshot for quick local runs.
+- JSON snapshot persistence for quick local runs and PostgreSQL-backed runtime persistence in the platform stack.
 - Dependency health checks for the full local Silver platform stack.
 
 The Podman Compose stack also includes:
@@ -158,9 +158,15 @@ SignalPlane is configured with environment variables.
 | `SIGNALPLANE_INGEST_TOKEN` | `dev-token` | Local bootstrap/admin token |
 | `SIGNALPLANE_DATA_PATH` | `data/signalplane.json` | File-backed persistence path |
 | `SIGNALPLANE_SEED_DEMO_DATA` | `true` | Seed demo services, metrics, logs, traces, and uptime monitor |
-| `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime metadata/control-plane store backend; PostgreSQL runtime wiring is still pending |
+| `SIGNALPLANE_STORE_BACKEND` | `json` | Runtime store backend. Use `json` for a local snapshot or `postgres` for PostgreSQL-backed runtime state |
 | `SIGNALPLANE_TELEMETRY_BACKEND` | `json` | Telemetry archival backend. Use `clickhouse` with the local platform stack |
 | `SIGNALPLANE_POSTGRES_ADDR` | empty | Optional dependency health check target |
+| `SIGNALPLANE_POSTGRES_URL` | empty | PostgreSQL connection URL used when `SIGNALPLANE_STORE_BACKEND=postgres` |
+| `SIGNALPLANE_POSTGRES_USER` | `signalplane` | PostgreSQL user used to build a connection URL when `SIGNALPLANE_POSTGRES_URL` is empty |
+| `SIGNALPLANE_POSTGRES_PASSWORD` | `signalplane` | PostgreSQL password used to build a connection URL when `SIGNALPLANE_POSTGRES_URL` is empty |
+| `SIGNALPLANE_POSTGRES_DATABASE` | `signalplane` | PostgreSQL database used to build a connection URL when `SIGNALPLANE_POSTGRES_URL` is empty |
+| `SIGNALPLANE_POSTGRES_SSLMODE` | `disable` | PostgreSQL SSL mode used to build a connection URL when `SIGNALPLANE_POSTGRES_URL` is empty |
+| `SIGNALPLANE_POSTGRES_TIMEOUT_SECONDS` | `5` | PostgreSQL startup/load/save timeout |
 | `SIGNALPLANE_CLICKHOUSE_URL` | empty | ClickHouse HTTP endpoint used when `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse` |
 | `SIGNALPLANE_CLICKHOUSE_DATABASE` | `signalplane` | ClickHouse database for telemetry archival |
 | `SIGNALPLANE_CLICKHOUSE_USER` | empty | Optional ClickHouse HTTP user |
@@ -186,7 +192,7 @@ SIGNALPLANE_DATA_PATH=/var/lib/signalplane/signalplane.json \
 
 ## Data Persistence
 
-Silver persists data to an atomic JSON snapshot file.
+Source runs default to an atomic JSON snapshot file.
 
 Default local path:
 
@@ -208,7 +214,9 @@ This file stores:
 - Uptime monitors.
 - Audit events.
 
-The full local stack provisions PostgreSQL and ClickHouse schemas. The current runtime still uses JSON persistence for metadata and API query state. When `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`, SignalPlane also archives incoming metrics, logs, traces, spans, and uptime results into ClickHouse over HTTP. PostgreSQL-backed metadata runtime wiring is still pending.
+The full local stack provisions PostgreSQL and ClickHouse schemas. Podman Compose runs SignalPlane with `SIGNALPLANE_STORE_BACKEND=postgres`, which stores the API/dashboard runtime snapshot in PostgreSQL. When `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`, SignalPlane also archives incoming metrics, logs, traces, spans, and uptime results into ClickHouse over HTTP.
+
+The current PostgreSQL runtime path persists the product state snapshot. A later Silver-hardening step should split that snapshot into normalized entity repositories for users, roles, dashboards, alert rules, notification channels, and richer metadata queries.
 
 ## Verify Installation
 

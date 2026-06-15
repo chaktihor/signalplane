@@ -160,8 +160,8 @@ Uptime monitors store HTTP check definitions and the local SignalPlane process c
 2. SignalPlane checks the token.
 3. SignalPlane normalizes resource metadata.
 4. SignalPlane creates or updates services and hosts.
-5. SignalPlane updates the JSON-backed runtime model used by the API and dashboard.
-6. SignalPlane writes a snapshot to disk.
+5. SignalPlane updates the runtime model used by the API and dashboard.
+6. SignalPlane persists that runtime snapshot to JSON or PostgreSQL, depending on `SIGNALPLANE_STORE_BACKEND`.
 7. If `SIGNALPLANE_TELEMETRY_BACKEND=clickhouse`, SignalPlane archives metrics, logs, traces, spans, and uptime results into ClickHouse.
 8. The dashboard reads data through APIs such as `/api/bootstrap`, `/api/services`, `/api/logs`, and `/api/traces`.
 
@@ -180,9 +180,9 @@ This is not a full user-login system yet.
 
 ## Persistence Model In Silver
 
-SignalPlane writes an atomic JSON snapshot after state-changing operations.
+SignalPlane writes a runtime snapshot after state-changing operations.
 
-This keeps the preview simple and installable. In the full Podman stack, telemetry can also be archived into ClickHouse. The dashboard and query APIs still read from the JSON-backed runtime model until the ClickHouse query layer and PostgreSQL metadata store are wired in.
+Source runs default to an atomic JSON file so the preview stays simple and installable. In the full Podman stack, runtime state is stored in PostgreSQL and telemetry is archived into ClickHouse. The dashboard and query APIs still read from the runtime model until the ClickHouse query layer and normalized PostgreSQL repositories are added.
 
 ## What Comes Next
 

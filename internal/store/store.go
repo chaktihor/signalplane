@@ -15,28 +15,32 @@ import (
 )
 
 type Store struct {
-	mu        sync.RWMutex
-	path      string
-	telemetry TelemetrySink
-	org       Organization
-	envs      []Environment
-	tokens    map[string]APIToken
-	services  map[string]Service
-	hosts     map[string]Host
-	metrics   []Metric
-	logs      []Log
-	traces    []Trace
-	alerts    map[string]Alert
-	incidents map[string]Incident
-	uptime    map[string]UptimeMonitor
-	audit     []AuditEvent
+	mu          sync.RWMutex
+	path        string
+	persistence stateStore
+	telemetry   TelemetrySink
+	org         Organization
+	envs        []Environment
+	tokens      map[string]APIToken
+	services    map[string]Service
+	hosts       map[string]Host
+	metrics     []Metric
+	logs        []Log
+	traces      []Trace
+	alerts      map[string]Alert
+	incidents   map[string]Incident
+	uptime      map[string]UptimeMonitor
+	audit       []AuditEvent
 }
 
 type Options struct {
-	Path           string
-	Seed           bool
-	BootstrapToken string
-	TelemetrySink  TelemetrySink
+	Path            string
+	Backend         string
+	Seed            bool
+	BootstrapToken  string
+	TelemetrySink   TelemetrySink
+	PostgresURL     string
+	PostgresTimeout time.Duration
 }
 
 type TelemetrySink interface {
@@ -44,6 +48,15 @@ type TelemetrySink interface {
 	WriteLogs([]Log) error
 	WriteTraces([]Trace) error
 	WriteUptimeResult(UptimeMonitor) error
+}
+
+type stateStore interface {
+	Load() (snapshot, bool, error)
+	Save(snapshot) error
+}
+
+type closeableStateStore interface {
+	Close()
 }
 
 type snapshot struct {
@@ -335,16 +348,21 @@ func Open(options Options) (*Store, error) {
 	if options.BootstrapToken == "" {
 		options.BootstrapToken = "dev-token"
 	}
-	if options.Path != "" {
-		loaded, err := load(options.Path)
-		if err == nil {
-			loaded.path = options.Path
+	persistence, err := stateStoreFromOptions(options)
+	if err != nil {
+		return nil, err
+	}
+	if persistence != nil {
+		snap, ok, err := persistence.Load()
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			loaded := storeFromSnapshot(snap)
+			loaded.persistence = persistence
 			loaded.telemetry = options.TelemetrySink
 			loaded.ensureBootstrapToken(options.BootstrapToken)
 			return loaded, loaded.saveLocked()
-		}
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
 		}
 	}
 
@@ -355,12 +373,19 @@ func Open(options Options) (*Store, error) {
 		s = New()
 	}
 	s.path = options.Path
+	s.persistence = persistence
 	s.telemetry = options.TelemetrySink
 	s.ensureBootstrapToken(options.BootstrapToken)
 	if err := s.saveLocked(); err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+func (s *Store) Close() {
+	if closer, ok := s.persistence.(closeableStateStore); ok {
+		closer.Close()
+	}
 }
 
 func NewSeeded() *Store {
@@ -394,15 +419,64 @@ func NewSeeded() *Store {
 	return s
 }
 
-func load(path string) (*Store, error) {
+func stateStoreFromOptions(options Options) (stateStore, error) {
+	backend := strings.ToLower(options.Backend)
+	if backend == "" {
+		backend = "json"
+	}
+	switch backend {
+	case "json", "file":
+		if options.Path == "" {
+			return nil, nil
+		}
+		return fileStateStore{path: options.Path}, nil
+	case "postgres", "postgresql":
+		return newPostgresStateStore(PostgresOptions{URL: options.PostgresURL, Timeout: options.PostgresTimeout})
+	default:
+		return nil, errors.New("unsupported store backend: " + options.Backend)
+	}
+}
+
+type fileStateStore struct {
+	path string
+}
+
+func (store fileStateStore) Load() (snapshot, bool, error) {
+	snap, err := loadSnapshot(store.path)
+	if errors.Is(err, os.ErrNotExist) {
+		return snapshot{}, false, nil
+	}
+	return snap, err == nil, err
+}
+
+func (store fileStateStore) Save(snap snapshot) error {
+	data, err := json.MarshalIndent(snap, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(store.path), 0o755); err != nil {
+		return err
+	}
+	tmp := store.path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, store.path)
+}
+
+func loadSnapshot(path string) (snapshot, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return snapshot{}, err
 	}
 	var snap snapshot
 	if err := json.Unmarshal(data, &snap); err != nil {
-		return nil, err
+		return snapshot{}, err
 	}
+	return snap, nil
+}
+
+func storeFromSnapshot(snap snapshot) *Store {
 	s := New()
 	s.org = snap.Organization
 	s.envs = snap.Environments
@@ -417,7 +491,7 @@ func load(path string) (*Store, error) {
 	s.uptime = snap.Uptime
 	s.audit = snap.Audit
 	s.normalizeLoaded()
-	return s, nil
+	return s
 }
 
 func (s *Store) normalizeLoaded() {
@@ -448,9 +522,6 @@ func (s *Store) normalizeLoaded() {
 }
 
 func (s *Store) saveLocked() error {
-	if s.path == "" {
-		return nil
-	}
 	snap := snapshot{
 		Organization: s.org,
 		Environments: append([]Environment(nil), s.envs...),
@@ -465,18 +536,10 @@ func (s *Store) saveLocked() error {
 		Uptime:       cloneMapValues(s.uptime),
 		Audit:        append([]AuditEvent(nil), s.audit...),
 	}
-	data, err := json.MarshalIndent(snap, "", "  ")
-	if err != nil {
-		return err
+	if s.persistence != nil {
+		return s.persistence.Save(snap)
 	}
-	if err := os.MkdirAll(filepath.Dir(s.path), 0o755); err != nil {
-		return err
-	}
-	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, s.path)
+	return nil
 }
 
 func (s *Store) ensureBootstrapToken(token string) {

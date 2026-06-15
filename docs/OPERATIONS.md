@@ -206,11 +206,12 @@ For source runs, dependency checks only appear when the corresponding `SIGNALPLA
 
 ## Production Caveat
 
-The Silver developer preview is not yet production-grade. It uses JSON snapshot persistence and does not yet have:
+The Silver developer preview is not yet production-grade. The Podman stack stores runtime state in PostgreSQL and archives telemetry in ClickHouse, but it does not yet have:
 
 - Full user login.
 - Full RBAC.
-- Runtime writes to PostgreSQL and ClickHouse.
+- Normalized PostgreSQL repositories for every control-plane entity.
+- ClickHouse-backed query APIs.
 - Retention policies.
 - Notification delivery.
 - Uptime history and availability rollups.

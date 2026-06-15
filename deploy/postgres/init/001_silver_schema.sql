@@ -169,6 +169,12 @@ CREATE INDEX IF NOT EXISTS idx_alerts_org_status_created ON alerts (organization
 CREATE INDEX IF NOT EXISTS idx_incidents_org_status_created ON incidents (organization_id, status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_org_created ON audit_events (organization_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS runtime_snapshots (
+  id TEXT PRIMARY KEY,
+  payload JSONB NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 INSERT INTO organizations (id, name)
 VALUES ('org-default', 'SignalPlane Local')
 ON CONFLICT (id) DO NOTHING;

@@ -48,7 +48,7 @@ The intent is to build a Dynatrace-equivalent product in three tiers:
 
 ## Status
 
-SignalPlane now has a Silver developer-preview foundation in this repository: a runnable Go service, embedded dashboard, HTTP JSON telemetry ingestion, scoped tokens, file-backed runtime persistence, ClickHouse telemetry archival in the Podman stack, and example telemetry producers.
+SignalPlane now has a Silver developer-preview foundation in this repository: a runnable Go service, embedded dashboard, HTTP JSON telemetry ingestion, scoped tokens, PostgreSQL-backed runtime persistence in the Podman stack, ClickHouse telemetry archival, and example telemetry producers.
 
 The current implementation is not production-grade. It is the baseline for iterating toward the full Silver MVP, then Gold and Platinum capabilities.
 
@@ -70,7 +70,7 @@ For containerized local installs with Podman:
 make stack-up
 ```
 
-Silver currently persists API/dashboard runtime state to an atomic JSON snapshot. The default local path is `data/signalplane.json`; Podman Compose stores it in a named volume. In the full Podman stack, incoming telemetry is also archived into ClickHouse.
+Silver can persist API/dashboard runtime state to either an atomic JSON snapshot or PostgreSQL. Source runs default to JSON at `data/signalplane.json`; Podman Compose runs with PostgreSQL for runtime state and archives incoming telemetry into ClickHouse.
 
 Start here:
 
@@ -84,7 +84,7 @@ Start here:
 
 - Single Go binary serving API and UI.
 - Podman Compose install.
-- File-backed persistence.
+- JSON or PostgreSQL-backed runtime persistence.
 - ClickHouse telemetry archival for the full local stack.
 - Persisted scoped API tokens.
 - Metrics ingestion.

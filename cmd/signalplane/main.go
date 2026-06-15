@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -32,15 +33,19 @@ func main() {
 
 	telemetrySink := telemetrySinkFromEnv(logger)
 	data, err := store.Open(store.Options{
-		Path:           envString("SIGNALPLANE_DATA_PATH", "data/signalplane.json"),
-		Seed:           envBool("SIGNALPLANE_SEED_DEMO_DATA", true),
-		BootstrapToken: cfg.IngestToken,
-		TelemetrySink:  telemetrySink,
+		Path:            envString("SIGNALPLANE_DATA_PATH", "data/signalplane.json"),
+		Backend:         envString("SIGNALPLANE_STORE_BACKEND", "json"),
+		Seed:            envBool("SIGNALPLANE_SEED_DEMO_DATA", true),
+		BootstrapToken:  cfg.IngestToken,
+		TelemetrySink:   telemetrySink,
+		PostgresURL:     postgresURLFromEnv(),
+		PostgresTimeout: envDurationSeconds("SIGNALPLANE_POSTGRES_TIMEOUT_SECONDS", 5),
 	})
 	if err != nil {
 		logger.Error("failed to open data store", "error", err)
 		os.Exit(1)
 	}
+	defer data.Close()
 
 	app := server.New(cfg, data, logger)
 	httpServer := app.HTTPServer()
@@ -93,6 +98,29 @@ func telemetrySinkFromEnv(logger *slog.Logger) store.TelemetrySink {
 		logger.Warn("unsupported telemetry backend, using local json snapshot only", "backend", backend)
 		return nil
 	}
+}
+
+func postgresURLFromEnv() string {
+	if value := os.Getenv("SIGNALPLANE_POSTGRES_URL"); value != "" {
+		return value
+	}
+	addr := os.Getenv("SIGNALPLANE_POSTGRES_ADDR")
+	if addr == "" {
+		return ""
+	}
+	postgresURL := url.URL{
+		Scheme: "postgres",
+		User: url.UserPassword(
+			envString("SIGNALPLANE_POSTGRES_USER", "signalplane"),
+			envString("SIGNALPLANE_POSTGRES_PASSWORD", "signalplane"),
+		),
+		Host: addr,
+		Path: envString("SIGNALPLANE_POSTGRES_DATABASE", "signalplane"),
+	}
+	query := postgresURL.Query()
+	query.Set("sslmode", envString("SIGNALPLANE_POSTGRES_SSLMODE", "disable"))
+	postgresURL.RawQuery = query.Encode()
+	return postgresURL.String()
 }
 
 func envString(key, fallback string) string {

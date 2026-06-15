@@ -37,7 +37,7 @@ This repository is now organized around a runnable Silver developer preview plus
 - `internal/platform`: local dependency health checks for PostgreSQL, ClickHouse, OpenTelemetry Collector, SMTP, and Mailpit.
 - `internal/server`: HTTP API, auth checks, embedded static web UI, and request/response handling.
 - `internal/server/web`: lightweight Silver dashboard.
-- `internal/store`: in-memory domain model, JSON snapshot persistence, token validation, service/host inference, telemetry ingestion, alert creation, and audit events.
+- `internal/store`: in-memory domain model, JSON or PostgreSQL runtime snapshot persistence, token validation, service/host inference, telemetry ingestion, alert creation, and audit events.
 
 ## Deployment
 
