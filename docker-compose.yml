@@ -37,6 +37,8 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.111.0
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      SIGNALPLANE_INGEST_TOKEN: "${SIGNALPLANE_INGEST_TOKEN:-dev-token}"
     ports:
       - "4317:4317"
       - "4319:4318"
@@ -94,10 +96,10 @@ services:
       - "4318:4318"
     environment:
       SIGNALPLANE_ADDR: "0.0.0.0:4318"
-      SIGNALPLANE_INGEST_TOKEN: "dev-token"
-      SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN: "dev-admin-token"
-      SIGNALPLANE_BOOTSTRAP_USER_EMAIL: "admin@signalplane.local"
-      SIGNALPLANE_BOOTSTRAP_USER_PASSWORD: "admin-password"
+      SIGNALPLANE_INGEST_TOKEN: "${SIGNALPLANE_INGEST_TOKEN:-dev-token}"
+      SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN: "${SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN:-dev-admin-token}"
+      SIGNALPLANE_BOOTSTRAP_USER_EMAIL: "${SIGNALPLANE_BOOTSTRAP_USER_EMAIL:-admin@signalplane.local}"
+      SIGNALPLANE_BOOTSTRAP_USER_PASSWORD: "${SIGNALPLANE_BOOTSTRAP_USER_PASSWORD:-admin-password}"
       SIGNALPLANE_REQUIRE_READ_AUTH: "true"
       SIGNALPLANE_DATA_PATH: "/data/signalplane.json"
       SIGNALPLANE_SEED_DEMO_DATA: "true"

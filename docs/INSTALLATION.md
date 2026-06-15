@@ -112,6 +112,15 @@ SIGNALPLANE_ADDR=0.0.0.0:4318 ./bin/signalplane
 make stack-up
 ```
 
+To avoid the local default ingest token, pass the same token into both
+SignalPlane and the gateway collector through the Compose environment:
+
+```bash
+SIGNALPLANE_INGEST_TOKEN=change-ingest-me \
+SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN=change-admin-me \
+make stack-up
+```
+
 Open:
 
 ```text

@@ -23,6 +23,18 @@ Run the full local stack:
 make stack-up
 ```
 
+Run the local stack with rotated demo tokens:
+
+```bash
+SIGNALPLANE_INGEST_TOKEN=change-ingest-me \
+SIGNALPLANE_BOOTSTRAP_ADMIN_TOKEN=change-admin-me \
+make stack-up
+```
+
+The Podman gateway collector reads `SIGNALPLANE_INGEST_TOKEN` from its
+environment and forwards telemetry with that bearer token. Do not edit collector
+YAML to rotate tokens.
+
 Stop the stack:
 
 ```bash

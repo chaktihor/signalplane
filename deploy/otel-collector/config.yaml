@@ -18,7 +18,7 @@ exporters:
   otlphttp/signalplane:
     endpoint: http://signalplane:4318
     headers:
-      Authorization: Bearer dev-token
+      Authorization: Bearer ${env:SIGNALPLANE_INGEST_TOKEN}
   debug:
     verbosity: normal
 

@@ -8,6 +8,19 @@ SignalPlane Silver uses collectors in two roles.
 SDKs, and local agents, then forwards OTLP HTTP to SignalPlane with the ingest
 token.
 
+The gateway profile does not store the ingest token in YAML. Set
+`SIGNALPLANE_INGEST_TOKEN` in the collector environment and source it from a
+secret manager, Kubernetes Secret, or local `.env` file:
+
+```bash
+SIGNALPLANE_INGEST_TOKEN='<collector-ingest-token>' podman compose up otel-collector
+```
+
+For the local Podman demo, `docker-compose.yml` falls back to `dev-token` when
+`SIGNALPLANE_INGEST_TOKEN` is not set. Production deployments should create a
+dedicated ingest-scoped token per collector group and rotate it without editing
+collector config files.
+
 Local ports:
 
 | Protocol | Port |

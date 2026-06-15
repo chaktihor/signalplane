@@ -82,6 +82,11 @@ exporters:
       Authorization: Bearer ${SIGNALPLANE_INGEST_TOKEN}
 ```
 
+Do not hard-code this token in collector config. Inject
+`SIGNALPLANE_INGEST_TOKEN` from a secret manager, Kubernetes Secret, Podman
+environment, or a local `.env` file. Rotate collector tokens by changing the
+secret/environment value and restarting the collector.
+
 Applications that emit OTLP gRPC should send to an OpenTelemetry Collector. The collector receives gRPC and forwards OTLP HTTP protobuf to SignalPlane.
 
 ## Local Log Agent
